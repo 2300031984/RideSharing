@@ -1,0 +1,97 @@
+.dashboard-content {
+  text-align: center;
+  margin-top: 2rem;
+  color: white;
+}
+
+.booking-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.booking-form input {
+  padding: 0.5rem 1rem;
+  width: 300px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.booking-form button {
+  background-color: #008CBA;
+  color: white;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.success-msg {
+  color: limegreen;
+  margin-top: 1rem;
+}
+
+.error-msg {
+  color: red;
+  margin-top: 1rem;
+}
+
+.ride-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+  align-items: center;
+}
+
+.ride-card {
+  background: #222;
+  color: #fff;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  width: 350px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.driver-dashboard .dashboard-content {
+  text-align: center;
+  margin-top: 2rem;
+  color: white;
+}
+
+.driver-dashboard .ride-card {
+  background: #23272f;
+  color: #fff;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  width: 350px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border 0.2s;
+}
+
+.driver-dashboard button {
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+@media (max-width: 900px) {
+  .driver-dashboard .dashboard-content > div {
+    flex-direction: column !important;
+    align-items: center;
+  }
+  .driver-dashboard .ride-card, .ride-history-list, .ride-card {
+    width: 95vw !important;
+    min-width: unset !important;
+  }
+}

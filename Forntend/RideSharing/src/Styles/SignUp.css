@@ -1,0 +1,129 @@
+/* General CSS Reset */
+body {
+    font-family: 'Poppins', sans-serif;
+    background-size: cover;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    color: white; /* Set default text color to white for better readability */
+    background-position: center;
+    background-attachment: fixed;
+}
+
+.container {
+    background: rgba(0, 0, 0, 0.7); /* Dark background to enhance text readability */
+    padding: 30px 40px;
+    border-radius: 16px;
+    box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.3);
+    width: 380px;
+    text-align: center;
+    animation: fadeIn 0.8s ease-in-out;
+    margin: 0 auto;
+    position: relative;
+    left: 0;
+    right: 0;
+}
+
+h2 {
+    margin-bottom: 20px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #fff;
+}
+
+input, select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    outline: none;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    margin-bottom: 15px;
+    background-color: #fff;
+    color: #333;
+}
+
+input:focus, select:focus {
+    border-color: #e52e71;
+    box-shadow: 0px 0px 8px rgba(229, 46, 113, 0.5);
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #ff8a00, #e52e71);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 20px;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background: linear-gradient(135deg, #e52e71, #ff8a00);
+    transform: scale(1.05);
+}
+
+.toggle-link {
+    margin-top: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    color: #e52e71;
+    font-weight: 500;
+}
+
+.toggle-link a {
+    text-decoration: none;
+    color: #e52e71;
+    font-weight: 600;
+}
+
+.toggle-link a:hover {
+    text-decoration: underline;
+}
+
+.form-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px; /* Add some space between the inputs */
+}
+
+.form-group input {
+    width: 48%; /* Ensures equal width for both First and Last Name fields */
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Add responsiveness */
+@media (max-width: 600px) {
+    .container {
+        width: 90%;
+        padding: 20px;
+    }
+    
+    .form-group {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .form-group input {
+        width: 100%;
+        margin-bottom: 10px; /* Add spacing between stacked inputs */
+    }
+}

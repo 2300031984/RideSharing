@@ -1,0 +1,662 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import UserNavbar from '../../components/UserNavbar';
+import { 
+  getRecentByIdLocal, 
+  updateRecentStatusLocal, 
+  getRideRequestStatus, 
+  pollRideRequestStatus,
+  getRideTracking,
+  getRideETA,
+  getUserNotifications,
+  markNotificationAsRead
+} from '../../services/RideService';
+import { connectRideSocket } from '../../services/RideService';
+import Toast from '../../components/Toast';
+
+const RideRequestWaiting = () => {
+  const navigate = useNavigate();
+  const { rideRequestId } = useParams();
+  const [status, setStatus] = useState('requested');
+  const [driver, setDriver] = useState(null);
+  const [toast, setToast] = useState({ message: '', type: 'info' });
+  const [loading, setLoading] = useState(false);
+  const [trackingInfo, setTrackingInfo] = useState(null);
+  const [eta, setEta] = useState(null);
+  const [mapCoords, setMapCoords] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [user, setUser] = useState(null);
+
+  const rideRequest = getRecentByIdLocal(rideRequestId);
+
+  useEffect(() => {
+    // Get current user
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    setUser(currentUser);
+
+    if (!rideRequest) {
+      setToast({ message: 'Ride request not found', type: 'error' });
+      navigate('/user');
+      return;
+    }
+
+    // Load initial status from backend
+    const loadInitialStatus = async () => {
+      try {
+        const rideData = await getRideRequestStatus(rideRequestId);
+        console.log('Initial ride data loaded:', rideData);
+        
+        if (rideData) {
+          const currentStatus = (rideData.status || '').toLowerCase() || 'requested';
+          console.log('🔍 Initial ride status:', currentStatus);
+          console.log('🔍 Initial ride data:', rideData);
+          console.log('🔍 Initial driver ID:', rideData.driverId);
+          setStatus(currentStatus);
+          
+          // If ride is already accepted or started, redirect immediately
+          if ((currentStatus.toLowerCase() === 'accepted' || currentStatus.toLowerCase() === 'started') && rideData.driverId) {
+            console.log('Ride already accepted/started on mount, redirecting immediately...');
+            // Redirect immediately without delay
+            navigate(`/ride/live/${rideRequestId}`);
+            return; // Exit early to prevent further processing
+          }
+          
+          if (rideData.driverId && rideData.status && rideData.status.toLowerCase() === 'accepted') {
+            // Fetch actual driver details
+            try {
+              const API = import.meta.env?.VITE_API_URL || 'http://localhost:8081';
+              const headers = currentUser?.token ? { Authorization: `Bearer ${currentUser.token}` } : {};
+              
+              const driverRes = await fetch(`${API}/api/profile/${rideData.driverId}?role=Driver`, { headers });
+              if (driverRes.ok) {
+                const driverData = await driverRes.json();
+                console.log('Initial driver data:', driverData);
+                
+                setDriver({
+                  name: driverData.name || driverData.username || rideData.driverName || 'Driver',
+                  rating: driverData.rating || 4.5,
+                  vehicleNo: driverData.vehicleNumber || rideData.vehicleNumber || 'N/A',
+                  phone: driverData.phoneNumber || driverData.phone || 'N/A',
+                  vehicleType: driverData.vehicleType || rideData.vehicleType || rideRequest?.vehicleType || 'car'
+                });
+              } else {
+                console.warn('Failed to fetch initial driver profile');
+                // Fallback
+                setDriver({
+                  name: rideData.driverName || 'Driver',
+                  rating: 4.5,
+                  vehicleNo: rideData.vehicleNumber || 'N/A',
+                  phone: 'N/A',
+                  vehicleType: rideData.vehicleType || rideRequest?.vehicleType || 'car'
+                });
+              }
+            } catch (driverError) {
+              console.error('Error fetching initial driver details:', driverError);
+              setDriver({
+                name: rideData.driverName || 'Driver',
+                rating: 4.5,
+                vehicleNo: rideData.vehicleNumber || 'N/A',
+                phone: 'N/A',
+                vehicleType: rideData.vehicleType || rideRequest?.vehicleType || 'car'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load initial status:', error);
+      }
+    };
+
+    // Load initial tracking info and notifications
+    const loadTrackingInfo = async () => {
+      try {
+        const tracking = await getRideTracking(rideRequestId);
+        if (tracking?.success) {
+          setTrackingInfo(tracking.tracking);
+          if (tracking.tracking?.latitude && tracking.tracking?.longitude) {
+            setMapCoords({ lat: tracking.tracking.latitude, lng: tracking.tracking.longitude });
+          }
+        }
+        
+        const etaData = await getRideETA(rideRequestId);
+        if (etaData?.success) {
+          setEta(etaData.eta);
+        }
+        
+        if (currentUser?.id) {
+          const userNotifications = await getUserNotifications(currentUser.id);
+          setNotifications(userNotifications);
+        }
+      } catch (error) {
+        console.error('Failed to load tracking info:', error);
+      }
+    };
+
+    loadInitialStatus();
+    loadTrackingInfo();
+  }, [rideRequestId, rideRequest, navigate]);
+
+  // Polling for real-time status updates
+  useEffect(() => {
+    if (status === 'cancelled' || status === 'completed') return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const ride = await pollRideRequestStatus(rideRequestId, async (updatedRide) => {
+          console.log('📡 Polling callback - Updated ride:', updatedRide);
+          const newStatus = (updatedRide.status || '').toLowerCase() || 'requested';
+          console.log('📡 Polling callback - New status:', newStatus, 'Previous status:', status);
+          console.log('📡 Polling callback - Driver ID:', updatedRide.driverId);
+          
+          setStatus(newStatus);
+          
+          if (newStatus.toLowerCase() === 'accepted' && updatedRide.driverId) {
+            console.log('🎉 Driver accepted! Driver ID:', updatedRide.driverId);
+            updateRecentStatusLocal(rideRequestId, 'accepted');
+            
+            // REDIRECT IMMEDIATELY FIRST - don't wait for driver details
+            console.log('🚀 Driver accepted! Redirecting IMMEDIATELY to /ride/live/' + rideRequestId);
+            navigate(`/ride/live/${rideRequestId}`);
+            
+            // Fetch driver details in background (won't block redirect)
+            try {
+              const user = JSON.parse(localStorage.getItem('user'));
+              const API = import.meta.env?.VITE_API_URL || 'http://localhost:8081';
+              const headers = user?.token ? { Authorization: `Bearer ${user.token}` } : {};
+              
+              const driverRes = await fetch(`${API}/api/profile/${updatedRide.driverId}?role=Driver`, { headers });
+              if (driverRes.ok) {
+                const driverData = await driverRes.json();
+                console.log('Fetched driver data:', driverData);
+                
+                setDriver({
+                  name: driverData.name || driverData.username || updatedRide.driverName || 'Driver',
+                  rating: driverData.rating || 4.5,
+                  vehicleNo: driverData.vehicleNumber || updatedRide.vehicleNumber || 'N/A',
+                  phone: driverData.phoneNumber || driverData.phone || 'N/A',
+                  vehicleType: driverData.vehicleType || updatedRide.vehicleType || rideRequest?.vehicleType || 'car'
+                });
+              }
+            } catch (driverError) {
+              console.error('Error fetching driver details:', driverError);
+            }
+          } else if (newStatus.toLowerCase() === 'started') {
+            // Ride has already started, redirect immediately
+            console.log('Ride already started, redirecting immediately to live tracking...');
+            navigate(`/ride/live/${rideRequestId}`);
+          } else if (newStatus.toLowerCase() === 'cancelled') {
+            updateRecentStatusLocal(rideRequestId, 'cancelled');
+            setToast({ message: 'Ride request was cancelled', type: 'error' });
+          }
+        });
+        
+        // Also check the returned ride directly (in case callback doesn't fire)
+        if (ride) {
+          console.log('🔍 Direct polling check - Ride data:', ride);
+          const directStatus = (ride.status || '').toLowerCase();
+          console.log('🔍 Direct polling check - Status:', directStatus, 'Has driver:', !!ride.driverId);
+          
+          // If ride is accepted or started, redirect immediately
+          if ((directStatus.toLowerCase() === 'accepted' || directStatus.toLowerCase() === 'started') && ride.driverId) {
+            console.log(`🚀 REDIRECT TRIGGERED! Status: ${directStatus}, Driver ID: ${ride.driverId}, Redirecting to /ride/live/${rideRequestId}`);
+            // Redirect immediately without delay
+            navigate(`/ride/live/${rideRequestId}`);
+          }
+        }
+
+        // Update tracking info and ETA
+        const tracking = await getRideTracking(rideRequestId);
+        if (tracking?.success) {
+          setTrackingInfo(tracking.tracking);
+          if (tracking.tracking?.latitude && tracking.tracking?.longitude) {
+            setMapCoords({ lat: tracking.tracking.latitude, lng: tracking.tracking.longitude });
+          }
+        }
+        
+        const etaData = await getRideETA(rideRequestId);
+        if (etaData?.success) {
+          setEta(etaData.eta);
+        }
+
+        // Check for new notifications
+        if (user?.id) {
+          const userNotifications = await getUserNotifications(user.id);
+          setNotifications(userNotifications);
+          
+          // Show new notifications as toasts
+          const newNotifications = userNotifications.filter(n => !n.read);
+          newNotifications.forEach(notification => {
+            setToast({ 
+              message: notification.message, 
+              type: notification.type === 'ride_accepted' ? 'success' : 'info' 
+            });
+            // Mark as read
+            markNotificationAsRead(user.id, notification.id);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to poll status:', error);
+      }
+    }, 2000); // Poll every 2 seconds for faster detection
+
+    return () => clearInterval(pollInterval);
+  }, [rideRequestId, rideRequest, user, navigate]); // Removed 'status' to prevent restart on status change
+
+  // Immediate redirect when status changes to accepted
+  useEffect(() => {
+    console.log('🔍 Redirect useEffect triggered - Status:', status, 'Driver:', !!driver);
+    if (status.toLowerCase() === 'accepted' && driver) {
+      console.log('🚀 IMMEDIATE REDIRECT: Status is accepted and driver found, redirecting NOW!');
+      // Redirect immediately without delay
+      navigate(`/ride/live/${rideRequestId}`);
+    }
+  }, [status, driver, navigate, rideRequestId]);
+
+  // WebSocket connection for real-time updates (fallback)
+  useEffect(() => {
+    const ws = connectRideSocket(rideRequestId, (msg) => {
+      if (!msg) return;
+      if (msg.type === 'status' && typeof msg.status === 'string') {
+        setStatus(msg.status);
+        if (msg.status.toLowerCase() === 'accepted' && msg.driver) {
+          setDriver(msg.driver);
+          setToast({ message: 'Driver accepted your ride request!', type: 'success' });
+        }
+      }
+    });
+    return () => { try { ws && ws.close(); } catch {} };
+  }, [rideRequestId]);
+
+  const handleCancelRequest = async () => {
+    const reason = prompt('Cancellation reason?');
+    if (!reason) return;
+    
+    setLoading(true);
+    try {
+      // Get current user ID from localStorage
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      
+      if (!userId) {
+        setToast({ message: 'User not found', type: 'error' });
+        return;
+      }
+
+      // Use the RideService API call
+      const { cancelRideApi } = await import('../../services/RideService');
+      const result = await cancelRideApi(rideRequestId, userId, reason);
+
+      if (result.success) {
+        setStatus('cancelled');
+        setToast({ message: result.message, type: 'success' });
+        setTimeout(() => navigate('/user'), 2000);
+      } else {
+        // Even if API fails, update local status
+        updateRecentStatusLocal(rideRequestId, 'cancelled');
+        setStatus('cancelled');
+        setToast({ message: result.message, type: 'warning' });
+        setTimeout(() => navigate('/user'), 2000);
+      }
+    } catch (e) {
+      console.error('Cancel request error:', e);
+      // Fallback: update local status even on error
+      updateRecentStatusLocal(rideRequestId, 'cancelled');
+      setStatus('cancelled');
+      setToast({ message: 'Ride cancelled locally. Please check your trip history.', type: 'warning' });
+      setTimeout(() => navigate('/user'), 2000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProceedToBooking = () => {
+    if (status.toLowerCase() === 'accepted') {
+      navigate(`/booking/${rideRequestId}`);
+    }
+  };
+
+  const getStatusMessage = () => {
+    switch (status.toLowerCase()) {
+      case 'requested':
+        return 'Searching for drivers...';
+      case 'accepted':
+        return 'Driver found! Ready to proceed.';
+      case 'driver_arrived':
+        return 'Driver has arrived!';
+      case 'in_progress':
+        return 'Ride in progress';
+      case 'completed':
+        return 'Ride completed';
+      case 'cancelled':
+        return 'Ride request cancelled';
+      default:
+        return 'Processing...';
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (status.toLowerCase()) {
+      case 'requested':
+        return '#f59e0b';
+      case 'accepted':
+        return '#22c55e';
+      case 'driver_arrived':
+        return '#22c55e';
+      case 'in_progress':
+        return '#3b82f6';
+      case 'completed':
+        return '#22c55e';
+      case 'cancelled':
+        return '#ef4444';
+      default:
+        return '#6b7280';
+    }
+  };
+
+  if (!rideRequest) {
+    return (
+      <div className="bg-secondary" style={{ minHeight: '100vh' }}>
+        <UserNavbar 
+          showTripHistory={false}
+          showWallet={false}
+          showPayment={false}
+          showReviews={false}
+          showEmergency={false}
+          showSettings={false}
+          showNotifications={false}
+          showContact={false}
+          showHelp={false}
+          showAbout={false}
+        />
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-2xl)' }}>
+          <div className="card" style={{ textAlign: 'center' }}>
+            <h2 className="text-primary">Ride Request Not Found</h2>
+            <p className="text-secondary">The requested ride could not be found.</p>
+            <button 
+              onClick={() => navigate('/user')} 
+              className="btn-primary"
+              style={{ marginTop: 'var(--space-lg)' }}
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-secondary" style={{ minHeight: '100vh' }}>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+          .pulse {
+            animation: pulse 2s infinite;
+          }
+        `}
+      </style>
+      <UserNavbar 
+        showTripHistory={false}
+        showWallet={false}
+        showPayment={false}
+        showReviews={false}
+        showEmergency={false}
+        showSettings={false}
+        showNotifications={false}
+        showContact={false}
+        showHelp={false}
+        showAbout={false}
+      />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-2xl)' }}>
+        <div style={{ marginBottom: 'var(--space-2xl)' }}>
+          <h1 className="text-primary" style={{ marginBottom: 'var(--space-sm)' }}>
+            Ride Request Status
+          </h1>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)' }}>
+          {/* Left Column - Ride Details */}
+          <div className="card">
+            <h3 className="text-primary" style={{ marginBottom: 'var(--space-lg)' }}>Ride Details</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+              <div>
+                <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--space-xs)' }}>Pickup Location</label>
+                <input
+                  type="text"
+                  value={rideRequest.pickup || ''}
+                  onChange={(e) => {
+                    const updatedRequest = { ...rideRequest, pickup: e.target.value };
+                    // Update local storage
+                    const recentRides = JSON.parse(localStorage.getItem('recentRides') || '[]');
+                    const updatedRides = recentRides.map(ride => 
+                      ride.id === rideRequestId ? updatedRequest : ride
+                    );
+                    localStorage.setItem('recentRides', JSON.stringify(updatedRides));
+                  }}
+                  placeholder="Enter pickup address"
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-sm)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--font-size-base)',
+                    background: 'var(--background)'
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--space-xs)' }}>Drop Location</label>
+                <input
+                  type="text"
+                  value={rideRequest.dropoff || ''}
+                  onChange={(e) => {
+                    const updatedRequest = { ...rideRequest, dropoff: e.target.value };
+                    // Update local storage
+                    const recentRides = JSON.parse(localStorage.getItem('recentRides') || '[]');
+                    const updatedRides = recentRides.map(ride => 
+                      ride.id === rideRequestId ? updatedRequest : ride
+                    );
+                    localStorage.setItem('recentRides', JSON.stringify(updatedRides));
+                  }}
+                  placeholder="Enter destination"
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-sm)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--font-size-base)',
+                    background: 'var(--background)'
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block' }}>Vehicle Type</label>
+                <div className="text-primary" style={{ fontSize: 'var(--font-size-base)', textTransform: 'uppercase' }}>{rideRequest.vehicleType}</div>
+              </div>
+              
+              <div>
+                <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block' }}>Estimated Fare</label>
+                <div className="text-success-600" style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>₹{rideRequest.fare}</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 'var(--space-lg)', padding: 'var(--space-md)', background: 'var(--primary-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-500)' }}>
+              <div className="text-primary" style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-xs)' }}>Status</div>
+              <div style={{ color: getStatusColor(), fontWeight: 'var(--font-weight-medium)' }}>{getStatusMessage()}</div>
+            </div>
+
+            {/* Real-time Tracking Info */}
+            {status.toLowerCase() === 'accepted' && trackingInfo && (
+              <div style={{ marginTop: 'var(--space-lg)', padding: 'var(--space-md)', background: 'var(--success-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success-500)' }}>
+                <div className="text-success-600" style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)' }}>🚗 Live Tracking</div>
+                
+                {eta && (
+                  <div style={{ marginBottom: 'var(--space-sm)' }}>
+                    <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-xs)' }}>Estimated Arrival</div>
+                    <div className="text-success-600" style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+                      {eta.minutes === 0 ? 'Driver has arrived!' : `${eta.minutes} minutes`}
+                    </div>
+                    <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>{eta.message}</div>
+                  </div>
+                )}
+
+                {trackingInfo.driver && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                    <div style={{ width: 8, height: 8, background: '#10b981', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div>
+                    <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                      Driver is {eta?.minutes === 0 ? 'here' : 'on the way'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Driver Info or Waiting */}
+          <div className="card">
+            {status.toLowerCase() === 'accepted' && driver ? (
+              <>
+                <h3 className="text-primary" style={{ marginBottom: 'var(--space-lg)' }}>Driver Details</h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+                  <div>
+                    <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block' }}>Driver Name</label>
+                    <div className="text-primary" style={{ fontSize: 'var(--font-size-base)' }}>{driver.name}</div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block' }}>Rating</label>
+                    <div className="text-primary" style={{ fontSize: 'var(--font-size-base)' }}>⭐ {driver.rating}</div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block' }}>Vehicle Number</label>
+                    <div className="text-primary" style={{ fontSize: 'var(--font-size-base)' }}>{driver.vehicleNo}</div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', display: 'block' }}>Phone</label>
+                    <div className="text-primary" style={{ fontSize: 'var(--font-size-base)' }}>{driver.phone}</div>
+                  </div>
+
+                  {/* Real-time status indicator */}
+                  <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-sm)', background: 'var(--success-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--success-200)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+                      <div style={{ width: 6, height: 6, background: '#10b981', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div>
+                      <div className="text-success-600" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
+                        {status.toLowerCase() === 'accepted' ? 'Driver is on the way' : 
+                         status.toLowerCase() === 'driver_arrived' ? 'Driver has arrived' :
+                         status.toLowerCase() === 'in_progress' ? 'Ride in progress' : 'Status unknown'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* OTP Block */}
+                {rideRequest?.otp && (
+                  <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-sm)', background: '#fff7ed', borderRadius: 'var(--radius-sm)', border: '1px dashed #fb923c' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#c2410c', marginBottom: 4 }}>Your OTP</div>
+                        <div style={{ fontSize: 20, letterSpacing: 4, fontFamily: 'monospace', color: '#ea580c' }}>{rideRequest.otp}</div>
+                      </div>
+                      <button
+                        onClick={() => { try { navigator.clipboard.writeText(String(rideRequest.otp)); setToast({ message: 'OTP copied', type: 'success' }); } catch {} }}
+                        style={{ padding: '8px 12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9a3412', marginTop: 4 }}>Share this OTP only with your driver to start the ride.</div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <h3 className="text-primary" style={{ marginBottom: 'var(--space-lg)' }}>Searching for Drivers</h3>
+                
+                <div style={{ textAlign: 'center', padding: 'var(--space-xl)' }}>
+                  <div style={{ fontSize: 'var(--font-size-4xl)', marginBottom: 'var(--space-lg)' }}>🔍</div>
+                  <div className="text-secondary" style={{ marginBottom: 'var(--space-md)' }}>
+                    We're looking for available drivers in your area...
+                  </div>
+                  <div className="text-tertiary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                    This usually takes 1-3 minutes
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: 'var(--space-md)', marginTop: 'var(--space-2xl)', justifyContent: 'center' }}>
+          {(status.toLowerCase() === 'requested' || status.toLowerCase() === 'accepted') && (
+            <button 
+              onClick={handleCancelRequest}
+              disabled={loading}
+              className="btn-outline"
+              style={{ 
+                color: 'var(--danger-600)',
+                borderColor: 'var(--danger-600)'
+              }}
+            >
+              {loading ? 'Cancelling...' : 'Cancel Request'}
+            </button>
+          )}
+          
+          {status.toLowerCase() === 'accepted' && (
+            <button 
+              onClick={handleProceedToBooking}
+              className="btn-success"
+              style={{ minWidth: '200px' }}
+            >
+              Proceed to Booking
+            </button>
+          )}
+
+          {/* Debug: Manual redirect button */}
+          {status.toLowerCase() === 'accepted' && (
+            <button 
+              onClick={() => {
+                console.log('🔧 Manual redirect triggered');
+                navigate(`/ride/live/${rideRequestId}`);
+              }}
+              style={{
+                padding: '12px 24px',
+                background: '#8b5cf6',
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: 14
+              }}
+            >
+              🔧 Manual Redirect (Debug)
+            </button>
+          )}
+
+          {status.toLowerCase() === 'cancelled' && (
+            <button 
+              onClick={() => navigate('/user')}
+              className="btn-primary"
+              style={{ minWidth: '200px' }}
+            >
+              Back to Dashboard
+            </button>
+          )}
+        </div>
+      </div>
+      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'info' })} />
+    </div>
+  );
+};
+
+export default RideRequestWaiting;
