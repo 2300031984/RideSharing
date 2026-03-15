@@ -108,14 +108,6 @@ RideSharingApp/
 ├── docs/               # System architecture & Logic flows
 └── tools/              # Postman Collections & Setup Scripts
 ```
-
----
-
-## 📸 Screenshots
-*(Coming soon - See docs/screenshots for planned views)*
-
----
-
 ## 🛠️ Tech Stack
 - **Backend**: Spring Boot, Spring Security, Spring Data JPA, Kafka, Redis, Quartz.
 - **Frontend**: React, TanStack Query, Socket.io-client, Google Maps API.
