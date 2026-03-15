@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: ridesharing-api
+    runtime: java
+    buildCommand: mvn clean install -DskipTests
+    startCommand: java -jar ridesharing/target/*.jar
+    envVars:
+      - key: PORT
+        value: 8081
+      - key: DB_HOST
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: ZIPKIN_ENDPOINT
+        sync: false
