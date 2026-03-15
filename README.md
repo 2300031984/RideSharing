@@ -43,6 +43,18 @@ graph TD
 
 ---
 
+## 🔑 Demo Credentials
+
+Once deployed or running locally, use these accounts to test the platform:
+
+| Role | Email | Password |
+| :--- | :---- | :------- |
+| **Rider** | `rider@example.com` | `password123` |
+| **Driver** | `driver@example.com` | `password123` |
+
+---
+
+
 ## 🚀 Local Setup (Prototype Mode)
 
 To run this project as a student prototype without setting up the full Kafka/Redis/Firebase infrastructure, use the **Prototype Flags**.
