@@ -28,15 +28,24 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isMockToken = user?.token && user.token.startsWith('mock-token-');
+
+    if (error.response?.status === 401 && !isMockToken) {
+      // Token expired or invalid (and not a mock token)
       if (user?.token) {
         // Clear invalid token and redirect to login
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
     }
+    
+    // 🚀 DEMO MODE: If API is down, just return a fake success for common GETs if we have local data
+    if (!error.response && isMockToken) {
+        console.warn('🚀 Demo Mode: Backend unreachable, proceeding with local mock logic.');
+        return Promise.resolve({ data: {} }); 
+    }
+
     return Promise.reject(error);
   }
 );

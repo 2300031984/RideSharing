@@ -4,6 +4,38 @@ const API_URL = import.meta.env?.VITE_API_URL || "http://localhost:8081";
 
 // 🔹 Login (role-aware)
 const login = (role, email, password) => {
+  const lowercaseEmail = email.toLowerCase().trim();
+  
+  // 🚀 DEMO MODE INTERCEPTION
+  if (lowercaseEmail === 'rider@example.com' && password === 'password123') {
+    return Promise.resolve({
+      data: {
+        id: 'demo-rider-123',
+        username: 'Demo Rider',
+        email: 'rider@example.com',
+        role: 'User',
+        token: 'mock-token-rider',
+        phoneNumber: '1234567890',
+        age: 25,
+        location: 'California, USA'
+      }
+    });
+  }
+
+  if (lowercaseEmail === 'driver@example.com' && password === 'password123') {
+    return Promise.resolve({
+      data: {
+        id: 'demo-driver-456',
+        name: 'Demo Driver',
+        email: 'driver@example.com',
+        role: 'Driver',
+        token: 'mock-token-driver',
+        vehicleType: 'SUV',
+        phoneNumber: '0987654321'
+      }
+    });
+  }
+
   const payload = {
     email: email.trim(),
     password: password.trim(),

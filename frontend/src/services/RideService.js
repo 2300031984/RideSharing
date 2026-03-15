@@ -7,11 +7,25 @@ const API_BASE = API_ROOT + '/api';
 // Use the authenticated axios instance
 
 // ✅ Get all available ride requests (for drivers)
-export const getRideRequests = () => {
+export const getRideRequests = async () => {
   try {
-    return api.get(`/rides/requests`);
+    const res = await api.get(`/rides/requests`);
+    return res.data;
   } catch (error) {
-    throw new Error(`Failed to get ride requests: ${error.message}`);
+    console.warn('RideService: Failed to get ride requests from API, using mock/local data');
+    const pending = readPending();
+    // If no local pending, provide some sample data for the demo
+    if (pending.length === 0) {
+      return [{
+        id: 'mock-ride-1',
+        pickupAddress: 'Downtown Mall',
+        dropoffAddress: 'Tech Park',
+        fare: 450,
+        status: 'REQUESTED',
+        createdAt: new Date().toISOString()
+      }];
+    }
+    return pending;
   }
 };
 

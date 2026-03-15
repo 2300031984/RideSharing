@@ -19,6 +19,10 @@ export const AuthProvider = ({ children }) => {
   // Check if token is expired
   const isTokenExpired = (token) => {
     if (!token) return true;
+    
+    // 🚀 DEMO MODE: Mock tokens never expire
+    if (token.startsWith('mock-token-')) return false;
+
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const currentTime = Date.now() / 1000;
