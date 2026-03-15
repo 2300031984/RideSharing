@@ -9,18 +9,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PaymentIntentDto {
     private Long rideId;
-    public Long getRideId() {
-		return rideId;
-	}
-	public void setRideId(Long rideId) {
-		this.rideId = rideId;
-	}
-	public double getAmount() {
-		return amount;
-	}
-	public void setAmount(double amount) {
-		this.amount = amount;
-	}
-	private double amount;
-	
+    private double amount;
 }

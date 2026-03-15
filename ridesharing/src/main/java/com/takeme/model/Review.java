@@ -14,74 +14,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Review {
-    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
-	}
-
-	public Long getRideId() {
-		return rideId;
-	}
-
-	public void setRideId(Long rideId) {
-		this.rideId = rideId;
-	}
-
-	public Long getReviewerId() {
-		return reviewerId;
-	}
-
-	public void setReviewerId(Long reviewerId) {
-		this.reviewerId = reviewerId;
-	}
-
-	public Long getRevieweeId() {
-		return revieweeId;
-	}
-
-	public void setRevieweeId(Long revieweeId) {
-		this.revieweeId = revieweeId;
-	}
-
-	public Integer getRating() {
-		return rating;
-	}
-
-	public void setRating(Integer rating) {
-		this.rating = rating;
-	}
-
-	public String getComment() {
-		return comment;
-	}
-
-	public void setComment(String comment) {
-		this.comment = comment;
-	}
-
-	public String getReviewerType() {
-		return reviewerType;
-	}
-
-	public void setReviewerType(String reviewerType) {
-		this.reviewerType = reviewerType;
-	}
-
-	public LocalDateTime getCreatedAt() {
-		return createdAt;
-	}
-
-	public void setCreatedAt(LocalDateTime createdAt) {
-		this.createdAt = createdAt;
-	}
 
 	@Column(nullable = false)
     private Long rideId;

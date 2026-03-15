@@ -1,9 +1,11 @@
 services:
   - type: web
     name: ridesharing-api
-    runtime: java
-    buildCommand: mvn clean install -DskipTests
-    startCommand: java -jar ridesharing/target/*.jar
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ridesharing/Dockerfile
+    # buildCommand and startCommand are handled by the Dockerfile
+
     envVars:
       - key: PORT
         value: 8081
