@@ -18,13 +18,6 @@ public class ApiResponse<T> {
         this.message = message;
         this.data = null;
     }
-
-    // Explicit All Args Constructor (Fix for IDE/Lombok issues)
-    public ApiResponse(boolean success, String message, T data) {
-        this.success = success;
-        this.message = message;
-        this.data = data;
-    }
     
     // Static helper for success with data and message
     public static <T> ApiResponse<T> success(String message, T data) {
