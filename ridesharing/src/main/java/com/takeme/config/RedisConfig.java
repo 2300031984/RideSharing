@@ -16,7 +16,7 @@ import org.springframework.data.redis.repository.configuration.EnableRedisReposi
 import java.time.Duration;
 
 @Configuration
-@EnableRedisRepositories(enabled = false)
+@EnableRedisRepositories
 public class RedisConfig {
 
     @Bean
