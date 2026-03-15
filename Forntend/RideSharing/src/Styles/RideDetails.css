@@ -1,0 +1,296 @@
+/* Ride Details Container - Compact */
+.ride-details-container {
+    max-width: 750px;
+    margin: 1.5rem auto;
+    padding: 0 1rem;
+    font-family: 'Poppins', sans-serif;
+    color: #1f2937;
+    font-size: 0.85rem;
+}
+
+.details-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.back-btn {
+    background: white;
+    border: 1px solid #e5e7eb;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-weight: 600;
+    color: #4b5563;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+}
+
+.back-btn:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+}
+
+.details-title h1 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin: 0;
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.details-title p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+/* Main Layout: 2 Columns */
+.details-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+}
+
+/* Card Styles */
+.details-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid #f3f4f6;
+    margin-bottom: 1rem;
+}
+
+.card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+    color: #111827;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Map Placeholder */
+/* Map Action */
+.map-action-box {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.view-map-btn {
+    display: block;
+    width: 100%;
+    padding: 0.8rem;
+    background: #eff6ff;
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px dashed #bfdbfe;
+    transition: all 0.2s;
+}
+
+.view-map-btn:hover {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+}
+
+.map-unavailable {
+    width: 100%;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    color: #9ca3af;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+/* Route Timeline */
+.route-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 0.8rem;
+}
+
+.timeline-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.dot.pickup {
+    background: #10b981;
+    box-shadow: 0 0 0 3px #d1fae5;
+}
+
+.dot.dropoff {
+    background: #ef4444;
+    box-shadow: 0 0 0 3px #fee2e2;
+}
+
+.line {
+    width: 2px;
+    flex: 1;
+    background: #e5e7eb;
+    margin: 3px 0;
+    min-height: 30px;
+}
+
+.timeline-content label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.1rem;
+}
+
+.timeline-content p {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0;
+}
+
+/* Info Row for key stats */
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+    padding-top: 0.8rem;
+    border-top: 1px dashed #e5e7eb;
+}
+
+.info-item {
+    text-align: center;
+}
+
+.info-item .value {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #1f2937;
+}
+
+.info-item .value.price {
+    color: #059669;
+}
+
+.info-item .label {
+    font-size: 0.7rem;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+/* Driver Section (Sidebar) */
+.driver-profile {
+    text-align: center;
+    margin-bottom: 0.8rem;
+}
+
+.driver-avatar {
+    width: 60px;
+    height: 60px;
+    background: #f3f4f6;
+    border-radius: 50%;
+    margin: 0 auto 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    border: 3px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.driver-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #111827;
+    margin: 0 0 0.2rem;
+}
+
+.rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: #fef3c7;
+    color: #d97706;
+    padding: 0.1rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.vehicle-info {
+    background: #f8fafc;
+    padding: 0.6rem;
+    border-radius: 6px;
+    margin-top: 0.8rem;
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.vehicle-plate {
+    font-family: monospace;
+    background: #e2e8f0;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #475569;
+}
+
+.status-badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+}
+
+.status-COMPLETED {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.status-CANCELLED {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.status-IN_PROGRESS {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}

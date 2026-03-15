@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import UserNavbar from '../../components/UserNavbar';
 import Toast from '../../components/Toast';
+import WebSocketService from '../../services/WebSocketService';
 
 const LiveRide = () => {
   const { rideRequestId } = useParams();
@@ -13,6 +14,7 @@ const LiveRide = () => {
   const [toast, setToast] = useState({ message: '', type: 'info' });
   const [showPayment, setShowPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [driverLocation, setDriverLocation] = useState(null);
 
   // Load ride details
   useEffect(() => {
@@ -103,11 +105,48 @@ const LiveRide = () => {
     };
     
     if (rideRequestId) {
+      // Load initial state
       loadRideDetails();
       
-      // Poll for updates every 3 seconds
-      const interval = setInterval(loadRideDetails, 3000);
-      return () => clearInterval(interval);
+      let subscription = null;
+      let locationSubscription = null;
+
+      // Connect to WebSocket Server
+      WebSocketService.connect(
+          () => {
+              console.log('Connected to WebSocket server');
+              // Subscribe to general ride status updates
+              subscription = WebSocketService.subscribeToRideUpdates(rideRequestId, (updatedRide) => {
+                  console.log('Received WebSocket Update:', updatedRide);
+                  loadRideDetails();
+              });
+
+              // Subscribe to live GPS coordinates
+              locationSubscription = WebSocketService.client.subscribe(
+                  `/topic/driver-location/${rideRequestId}`, 
+                  (message) => {
+                      if (message.body) {
+                          const payload = JSON.parse(message.body);
+                          setDriverLocation({
+                              lat: payload.latitude,
+                              lng: payload.longitude,
+                              heading: payload.heading || 0
+                          });
+                      }
+                  }
+              );
+          },
+          (error) => {
+              console.error('WebSocket connection error:', error);
+          }
+      );
+      
+      // Cleanup connection on unmount
+      return () => {
+          if (subscription) subscription.unsubscribe();
+          if (locationSubscription) locationSubscription.unsubscribe();
+          WebSocketService.disconnect();
+      };
     }
   }, [rideRequestId]);
 
@@ -279,11 +318,23 @@ const LiveRide = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
           {/* Map Placeholder */}
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', height: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ textAlign: 'center', color: '#6b7280' }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
-              <div style={{ fontSize: 18, fontWeight: 600 }}>Live Map</div>
-              <div style={{ fontSize: 14 }}>Real-time tracking will be shown here</div>
-            </div>
+            {driverLocation ? (
+                 <iframe
+                  title="live-driver-map"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${driverLocation.lng-0.01}%2C${driverLocation.lat-0.01}%2C${driverLocation.lng+0.01}%2C${driverLocation.lat+0.01}&layer=mapnik&marker=${driverLocation.lat}%2C${driverLocation.lng}`}
+                 ></iframe>
+            ) : (
+                <div style={{ textAlign: 'center', color: '#6b7280' }}>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
+                  <div style={{ fontSize: 18, fontWeight: 600 }}>Live Map</div>
+                  <div style={{ fontSize: 14 }}>Real-time tracking will appear once driver starts moving</div>
+                </div>
+            )}
           </div>
           
           {/* Details Panel */}

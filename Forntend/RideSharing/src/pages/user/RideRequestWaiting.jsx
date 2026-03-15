@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import UserNavbar from '../../components/UserNavbar';
 import Toast from '../../components/Toast';
+import WebSocketService from '../../services/WebSocketService';
 
 const RideRequestWaiting = () => {
   const navigate = useNavigate();
@@ -95,35 +96,29 @@ const RideRequestWaiting = () => {
     }
   };
 
-  // Polling for real-time status updates
+  // WebSocket for real-time status updates
   useEffect(() => {
     if (status === 'cancelled' || status === 'completed') return;
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const user = JSON.parse(localStorage.getItem('user'));
-        const API = import.meta.env?.VITE_API_URL || 'http://localhost:8081';
-        const headers = user?.token ? { Authorization: `Bearer ${user.token}` } : {};
-        
-        console.log('📡 Polling for updates...');
-        
-        const res = await fetch(`${API}/api/rides/${rideRequestId}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          const ride = data?.ride;
+    let subscription = null;
+
+    WebSocketService.connect(
+      () => {
+        console.log('Connected to WebSocket in RideRequestWaiting');
+        subscription = WebSocketService.subscribeToRideUpdates(rideRequestId, async (updatedRide) => {
+          console.log('Received WebSocket Update:', updatedRide);
           
-          if (ride) {
-            const newStatus = (ride.status || '').toLowerCase();
-            console.log('📊 Polling - Current status:', newStatus, 'Previous:', status);
+          if (updatedRide) {
+            const newStatus = (updatedRide.status || '').toLowerCase();
+            console.log('📊 WS - Current status:', newStatus, 'Previous:', status);
             
             setStatus(newStatus);
             
             // If ride is accepted and has driver, redirect immediately
-            if (newStatus === 'accepted' && ride.driverId) {
+            if (newStatus === 'accepted' && updatedRide.driverId) {
               console.log('🎉 DRIVER ACCEPTED! Redirecting immediately...');
               setToast({ message: 'Driver found! Redirecting to tracking...', type: 'success' });
               
-              // Redirect immediately
               setTimeout(() => {
                 navigate(`/ride/live/${rideRequestId}`);
               }, 1000);
@@ -146,19 +141,21 @@ const RideRequestWaiting = () => {
             }
             
             // If ride has a driver but status is still requested, load driver details
-            if (ride.driverId && !driver) {
-              await loadDriverDetails(ride.driverId);
+            if (updatedRide.driverId && !driver) {
+              await loadDriverDetails(updatedRide.driverId);
             }
           }
-        } else {
-          console.error('❌ Polling failed:', res.status);
-        }
-      } catch (error) {
-        console.error('❌ Polling error:', error);
+        });
+      },
+      (error) => {
+        console.error('WebSocket connection error:', error);
       }
-    }, 2000); // Poll every 2 seconds
+    );
 
-    return () => clearInterval(pollInterval);
+    return () => {
+      if (subscription) subscription.unsubscribe();
+      WebSocketService.disconnect();
+    };
   }, [rideRequestId, status, driver, navigate]);
 
   const handleCancelRequest = async () => {

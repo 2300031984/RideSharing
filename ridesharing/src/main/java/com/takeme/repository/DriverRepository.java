@@ -15,6 +15,7 @@ public interface DriverRepository extends JpaRepository<Driver, Long> {
     boolean existsByLicenseNumber(String licenseNumber);
     
     List<Driver> findByStatus(Driver.DriverStatus status);
+    Optional<Driver> findByFcmToken(String fcmToken);
     List<Driver> findByVehicleType(String vehicleType);
     
     @Query("SELECT DISTINCT d.vehicleType FROM Driver d WHERE d.vehicleType IS NOT NULL AND d.active = true")

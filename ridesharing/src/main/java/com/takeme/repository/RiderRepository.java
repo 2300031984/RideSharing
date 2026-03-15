@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface RiderRepository extends JpaRepository<Rider, Long> {
     Optional<Rider> findByEmail(String email);
+    Optional<Rider> findByFcmToken(String fcmToken);
     boolean existsByEmail(String email);
 }

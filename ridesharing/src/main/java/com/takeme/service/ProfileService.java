@@ -106,4 +106,18 @@ public class ProfileService {
         
         return driverRepository.save(driver);
     }
+
+    public void updateFcmToken(Long userId, String role, String token) {
+        if ("Driver".equalsIgnoreCase(role)) {
+            Driver driver = driverRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Driver not found"));
+            driver.setFcmToken(token);
+            driverRepository.save(driver);
+        } else {
+            Rider rider = riderRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+            rider.setFcmToken(token);
+            riderRepository.save(rider);
+        }
+    }
 }

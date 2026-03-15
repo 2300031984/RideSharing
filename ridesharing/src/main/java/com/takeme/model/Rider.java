@@ -136,6 +136,14 @@ public class Rider {
 		this.updatedAt = updatedAt;
 	}
 
+    public String getFcmToken() {
+        return fcmToken;
+    }
+
+    public void setFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
+
 	@Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -175,6 +183,9 @@ public class Rider {
     
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    
+    @Column(name = "fcm_token")
+    private String fcmToken;
 
 	
 }

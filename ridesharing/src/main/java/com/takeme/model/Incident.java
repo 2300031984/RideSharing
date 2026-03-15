@@ -136,6 +136,28 @@ public class Incident {
     
     private String severity; // Low, Medium, High, Critical
     
+    // Additional Details from Frontend
+    private String driverName;
+    private String vehicleNumber;
+    private String contactNumber;
+    private String contactEmail;
+    private String incidentTime; // Time of incident occurrence
+    
+    public String getDriverName() { return driverName; }
+    public void setDriverName(String driverName) { this.driverName = driverName; }
+    
+    public String getVehicleNumber() { return vehicleNumber; }
+    public void setVehicleNumber(String vehicleNumber) { this.vehicleNumber = vehicleNumber; }
+    
+    public String getContactNumber() { return contactNumber; }
+    public void setContactNumber(String contactNumber) { this.contactNumber = contactNumber; }
+    
+    public String getContactEmail() { return contactEmail; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+    
+    public String getIncidentTime() { return incidentTime; }
+    public void setIncidentTime(String incidentTime) { this.incidentTime = incidentTime; }
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime reportedAt;

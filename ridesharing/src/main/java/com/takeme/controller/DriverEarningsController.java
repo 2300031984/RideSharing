@@ -1,7 +1,7 @@
 package com.takeme.controller;
 
 import com.takeme.dto.ApiResponse;
-import com.takeme.model.Driver;
+
 import com.takeme.service.DriverEarningsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -41,17 +41,5 @@ public class DriverEarningsController {
         }
     }
     
-    @GetMapping("/nearby")
-    public ResponseEntity<?> getNearbyDrivers(
-            @RequestParam Double latitude,
-            @RequestParam Double longitude,
-            @RequestParam(defaultValue = "5.0") Double radius) {
-        try {
-            List<Driver> drivers = earningsService.getNearbyDrivers(latitude, longitude, radius);
-            return ResponseEntity.ok(drivers);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(e.getMessage()));
-        }
-    }
+
 }

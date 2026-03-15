@@ -103,4 +103,18 @@ public class ProfileController {
                 .body(ApiResponse.error(e.getMessage()));
         }
     }
+
+    @PostMapping("/users/fcm-token")
+    public ResponseEntity<?> updateFcmToken(
+            @RequestParam Long userId,
+            @RequestParam String role,
+            @RequestParam String token) {
+        try {
+            profileService.updateFcmToken(userId, role, token);
+            return ResponseEntity.ok(ApiResponse.success("FCM token updated successfully", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+        }
+    }
 }

@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import UserNavbar from '../../components/UserNavbar';
 import { requestRide, estimateFare, getNearbyDrivers, addPendingRideLocal } from '../../services/RideService';
 import Toast from '../../components/Toast';
 
 const UserDashboard = () => {
   const navigate = useNavigate();
+  const locationState = useLocation();
   const user = JSON.parse(localStorage.getItem('user')) || {};
 
   const GOOGLE_KEY = import.meta.env?.VITE_GOOGLE_MAPS_API_KEY;
@@ -57,6 +58,16 @@ const UserDashboard = () => {
     document.head.appendChild(s);
   }, []);
 
+  useEffect(() => {
+    if (locationState.state?.repeatTrip) {
+      const { pickup, dropoff } = locationState.state.repeatTrip;
+      if (pickup) setPickupAddress(pickup);
+      if (dropoff) setDropoffAddress(dropoff);
+      // Logic to geocode these to coords would ideally go here, but for now we just set text.
+      // The computeEstimate logic checks for coords for accurate pricing, but text is enough to start.
+    }
+  }, [locationState]);
+
   const initAutocomplete = () => {
     try {
       if (!window.google?.maps?.places) return;
@@ -92,7 +103,7 @@ const UserDashboard = () => {
         streetViewControl: false,
         fullscreenControl: false,
       });
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -108,11 +119,11 @@ const UserDashboard = () => {
       if (!pickupCoords) { setDrivers([]); return; }
       const apiDrivers = await getNearbyDrivers({ lat: pickupCoords.lat, lng: pickupCoords.lng });
       if (apiDrivers && apiDrivers.length) {
-        // normalize to expected shape
+        // normalize to expected NearbyDriverDto shape from backend
         const list = apiDrivers.map((d, i) => ({
-          id: d.id || i + 1,
-          vehicleType: d.vehicleType || 'car',
-          position: { lat: d.lat, lng: d.lng },
+          id: d.driverId || i + 1,
+          vehicleType: 'car', // Defaulting since we don't store vehicle type in Geospatial hash yet
+          position: { lat: d.latitude, lng: d.longitude },
         }));
         setDrivers(list);
         return;
@@ -122,7 +133,7 @@ const UserDashboard = () => {
       const list = Array.from({ length: count }).map((_, i) => {
         const latJitter = (Math.random() - 0.5) * 0.01; // ~1km
         const lngJitter = (Math.random() - 0.5) * 0.01;
-        const types = ['bike','auto','car','prime'];
+        const types = ['bike', 'auto', 'car', 'prime'];
         return {
           id: i + 1,
           vehicleType: types[i % types.length],
@@ -317,7 +328,7 @@ const UserDashboard = () => {
         distance: `${estimate.distance} km`,
         duration: `${estimate.duration} min`,
       });
-      const rideRequestId = res?.data?.id || res?.data?.rideRequestId || Math.floor(Math.random()*1e6).toString();
+      const rideRequestId = res?.data?.id || res?.data?.rideRequestId || Math.floor(Math.random() * 1e6).toString();
       // also add to pending queue for driver mock feed
       addPendingRideLocal({
         id: rideRequestId,
@@ -372,33 +383,33 @@ const UserDashboard = () => {
           {/* Left Column - Book Your Ride */}
           <div className="card">
             <h3 className="text-primary" style={{ marginBottom: 'var(--space-lg)' }}>Book Your Ride</h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
               <div>
                 <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-xs)', marginBottom: 'var(--space-xs)', display: 'block' }}>Pickup Location</label>
-                <input 
-                  ref={pickupRef} 
-                  value={pickupAddress} 
-                  onChange={(e)=>{setPickupAddress(e.target.value); setPickupCoords(null);}} 
-                  placeholder="Enter pickup location" 
+                <input
+                  ref={pickupRef}
+                  value={pickupAddress}
+                  onChange={(e) => { setPickupAddress(e.target.value); setPickupCoords(null); }}
+                  placeholder="Enter pickup location"
                   style={{ width: '100%', fontSize: 'var(--font-size-xs)', padding: 'var(--space-xs) var(--space-sm)' }}
                 />
               </div>
-              
+
               <div>
                 <label className="text-secondary" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-xs)', marginBottom: 'var(--space-xs)', display: 'block' }}>Destination</label>
-                <input 
-                  ref={dropoffRef} 
-                  value={dropoffAddress} 
-                  onChange={(e)=>{setDropoffAddress(e.target.value); setDropoffCoords(null);}} 
-                  placeholder="Enter destination" 
+                <input
+                  ref={dropoffRef}
+                  value={dropoffAddress}
+                  onChange={(e) => { setDropoffAddress(e.target.value); setDropoffCoords(null); }}
+                  placeholder="Enter destination"
                   style={{ width: '100%', fontSize: 'var(--font-size-xs)', padding: 'var(--space-xs) var(--space-sm)' }}
                 />
               </div>
-              
-              <button 
-                type="button" 
-                onClick={useMyLocation} 
+
+              <button
+                type="button"
+                onClick={useMyLocation}
                 className="btn-outline"
                 style={{ alignSelf: 'flex-start', fontSize: 'var(--font-size-xs)', padding: 'var(--space-xs) var(--space-sm)' }}
               >
@@ -410,22 +421,22 @@ const UserDashboard = () => {
           {/* Middle Column - Vehicle Selection & Actions */}
           <div className="card">
             <h3 className="text-primary" style={{ marginBottom: 'var(--space-lg)' }}>Choose Vehicle</h3>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-xs)', marginBottom: 'var(--space-md)' }}>
               {rideTypes.map(rt => (
-                <button 
-                  key={rt.id} 
-                  onClick={()=>setRideType(rt.id)} 
+                <button
+                  key={rt.id}
+                  onClick={() => setRideType(rt.id)}
                   className="btn-ghost"
-                  style={{ 
-                    padding: 'var(--space-sm)', 
-                    borderRadius: 'var(--radius-md)', 
-                    border: rideType===rt.id ? `2px solid ${rt.color}` : '1px solid var(--border-light)', 
-                    background: rideType===rt.id ? 'var(--primary-50)' : 'var(--bg-primary)', 
+                  style={{
+                    padding: 'var(--space-sm)',
+                    borderRadius: 'var(--radius-md)',
+                    border: rideType === rt.id ? `2px solid ${rt.color}` : '1px solid var(--border-light)',
+                    background: rideType === rt.id ? 'var(--primary-50)' : 'var(--bg-primary)',
                     textAlign: 'center'
                   }}
-                  onMouseOver={(e) => { if(rideType!==rt.id) { e.target.style.borderColor = rt.color; e.target.style.background = 'var(--gray-100)'; } }}
-                  onMouseOut={(e) => { if(rideType!==rt.id) { e.target.style.borderColor = 'var(--border-light)'; e.target.style.background = 'var(--bg-primary)'; } }}
+                  onMouseOver={(e) => { if (rideType !== rt.id) { e.target.style.borderColor = rt.color; e.target.style.background = 'var(--gray-100)'; } }}
+                  onMouseOut={(e) => { if (rideType !== rt.id) { e.target.style.borderColor = 'var(--border-light)'; e.target.style.background = 'var(--bg-primary)'; } }}
                 >
                   <div style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-xs)' }}>{rt.icon}</div>
                   <div className="text-primary" style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-xs)' }}>{rt.name}</div>
@@ -434,18 +445,18 @@ const UserDashboard = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
-              <button 
-                onClick={computeEstimate} 
-                disabled={!pickupAddress || !dropoffAddress || loadingEstimate} 
+              <button
+                onClick={computeEstimate}
+                disabled={!pickupAddress || !dropoffAddress || loadingEstimate}
                 className="btn-primary"
                 style={{ width: '100%', fontSize: 'var(--font-size-xs)', padding: 'var(--space-xs) var(--space-sm)' }}
               >
                 {loadingEstimate ? '⏳ Estimating...' : '💰 Get Estimate'}
               </button>
-              
-              <button 
-                onClick={onRequestRide} 
-                disabled={!estimate || requesting} 
+
+              <button
+                onClick={onRequestRide}
+                disabled={!estimate || requesting}
                 className="btn-success"
                 style={{ width: '100%', fontSize: 'var(--font-size-xs)', padding: 'var(--space-xs) var(--space-sm)' }}
               >
@@ -482,25 +493,25 @@ const UserDashboard = () => {
               key={item.path}
               onClick={() => navigate(item.path)}
               className="card"
-              style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                textAlign: 'center', 
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
                 minHeight: 120,
                 border: '2px solid var(--border-light)',
                 cursor: 'pointer',
                 padding: 'var(--space-md)'
               }}
-              onMouseOver={(e) => { 
-                e.currentTarget.style.borderColor = item.color; 
-                e.currentTarget.style.background = 'var(--primary-50)'; 
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = item.color;
+                e.currentTarget.style.background = 'var(--primary-50)';
                 e.currentTarget.style.transform = 'translateY(-2px)';
                 e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
               }}
-              onMouseOut={(e) => { 
-                e.currentTarget.style.borderColor = 'var(--border-light)'; 
-                e.currentTarget.style.background = 'var(--bg-primary)'; 
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-light)';
+                e.currentTarget.style.background = 'var(--bg-primary)';
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
               }}

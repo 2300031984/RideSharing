@@ -130,6 +130,16 @@ public class ScheduledRideRequest {
     
     @NotBlank(message = "Scheduled time is required")
     private String scheduledTime;
+    
+    private String specialRequests;
+
+	public String getSpecialRequests() {
+		return specialRequests;
+	}
+
+	public void setSpecialRequests(String specialRequests) {
+		this.specialRequests = specialRequests;
+	}
 
 	
 }

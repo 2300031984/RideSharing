@@ -200,6 +200,14 @@ public class Driver {
 		this.updatedAt = updatedAt;
 	}
 
+    public String getFcmToken() {
+        return fcmToken;
+    }
+
+    public void setFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
+
 	@Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -215,6 +223,9 @@ public class Driver {
     
     @Column(nullable = false)
     private String role = "Driver";
+    
+    @Column(name = "fcm_token")
+    private String fcmToken;
     
     @Column(unique = true)
     private String licenseNumber;

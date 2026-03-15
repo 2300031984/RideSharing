@@ -1,0 +1,359 @@
+/* Report Incident Container - Compact */
+.report-container {
+    max-width: 850px;
+    margin: 1rem auto;
+    padding: 0 1rem;
+    font-family: 'Poppins', sans-serif;
+    color: #1f2937;
+    font-size: 0.95rem;
+    /* Base font size reduction */
+}
+
+.report-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #DC2626;
+    margin-bottom: 0.8rem;
+    text-align: center;
+}
+
+.report-title::after {
+    display: none;
+    /* remove separator to save space */
+}
+
+/* Card Styling */
+.report-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    padding: 1.25rem;
+    border: 1px solid #f3f4f6;
+}
+
+/* Split Layout */
+.form-layout {
+    display: grid;
+    grid-template-columns: 40% 60%;
+    /* Fixed ratio for compact lock */
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.form-column-left,
+.form-column-right {
+    min-width: 0;
+}
+
+/* Form Groups */
+.form-section {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #374151;
+    margin-bottom: 0.3rem;
+}
+
+.required-mark {
+    color: #dc2626;
+    margin-left: 2px;
+}
+
+/* Incident Types Grid - Mini Boxes */
+.incident-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    /* Very compact */
+    gap: 0.5rem;
+}
+
+.incident-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Center align for mini box look */
+    text-align: center;
+    gap: 0.2rem;
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    background: white;
+    transition: all 0.2s ease;
+    height: 100%;
+}
+
+.incident-option:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+.incident-option.selected {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+
+.incident-radio {
+    margin-top: 0;
+    /* transform: scale(0.8); removed for clarity */
+}
+
+.incident-content h4 {
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    font-size: 0.75rem;
+}
+
+.incident-content p {
+    display: none;
+    /* Hide descriptions to save space for 'mini' look */
+}
+
+/* Severity Levels */
+.severity-grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.severity-option {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    background: white;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.severity-option:hover {
+    background: #f8fafc;
+}
+
+.severity-option.selected {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.severity-label {
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-bottom: 0;
+    color: #1f2937;
+}
+
+.severity-desc {
+    font-size: 0.65rem;
+    color: #6b7280;
+}
+
+/* Inputs & Textarea */
+.form-input,
+.form-textarea,
+.form-select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #1f2937;
+    background: #f9fafb;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* Input Group (Date/Time, Location) */
+.input-group-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.input-with-action {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.action-btn {
+    padding: 0 1.25rem;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.action-btn:hover:not(:disabled) {
+    background: #2563eb;
+}
+
+.action-btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.action-btn.secondary {
+    background: #f3f4f6;
+    color: #4b5563;
+    border: 1px solid #d1d5db;
+}
+
+.action-btn.secondary:hover {
+    background: #e5e7eb;
+}
+
+/* Location Status */
+.location-status {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: #ecfeff;
+    border: 1px solid #cffafe;
+    border-radius: 8px;
+    color: #0e7490;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #f3f4f6;
+}
+
+.btn-cancel {
+    padding: 0.75rem 1.5rem;
+    background: white;
+    border: 1px solid #d1d5db;
+    color: #4b5563;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.btn-submit {
+    padding: 0.75rem 2rem;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(220, 38, 38, 0.2);
+    transition: all 0.2s;
+}
+
+.btn-submit:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 8px rgba(220, 38, 38, 0.3);
+}
+
+.btn-submit:disabled {
+    background: #ef4444;
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Warning Notice */
+.notice-card {
+    margin-top: 2rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    gap: 1rem;
+}
+
+.notice-icon {
+    font-size: 1.5rem;
+}
+
+.notice-content h4 {
+    margin: 0 0 0.5rem 0;
+    color: #991b1b;
+    font-weight: 700;
+}
+
+.notice-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #7f1d1d;
+    line-height: 1.6;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .report-container {
+        padding: 0 1rem;
+    }
+
+    .report-card {
+        padding: 1.5rem;
+    }
+
+    .input-group-row {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .severity-grid {
+        flex-wrap: wrap;
+    }
+
+    .severity-option {
+        min-width: 45%;
+    }
+
+    .input-with-action {
+        flex-direction: column;
+    }
+
+    .action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}

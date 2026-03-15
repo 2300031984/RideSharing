@@ -117,6 +117,7 @@ public class Transaction {
     
     private String paymentMethod; // WALLET, UPI, CARD, CASH
     
+    @Column(unique = true)
     private String transactionId;
     
     private String description;

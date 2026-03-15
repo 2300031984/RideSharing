@@ -4,6 +4,7 @@ import DriverNavbar from '../../components/DriverNavbar';
 import Card from '../../components/ui/Card';
 import Toast from '../../components/Toast';
 import { getRideTracking, updateDriverLocation, getRideETA } from '../../services/RideService';
+import WebSocketService from '../../services/WebSocketService';
 
 const ActiveRideTracking = () => {
   const navigate = useNavigate();
@@ -114,36 +115,60 @@ const ActiveRideTracking = () => {
     setIsTracking(true);
     setToast({ message: 'Location tracking started!', type: 'success' });
     
-    // Simulate location updates every 5 seconds
-    const locationInterval = setInterval(async () => {
-      if (!isTracking) {
-        clearInterval(locationInterval);
-        return;
-      }
+    // Ensure STOMP is connected before tracking
+    WebSocketService.connect();
 
-      try {
-        // Mock location data - in real implementation, get from GPS
-        const mockLocation = {
-          latitude: 12.9716 + (Math.random() - 0.5) * 0.01,
-          longitude: 77.5946 + (Math.random() - 0.5) * 0.01,
-          address: 'Near pickup location'
-        };
+    if ("geolocation" in navigator) {
+      window.locationTrackingInterval = navigator.geolocation.watchPosition(
+        async (position) => {
+          if (!activeRide?.id) return;
+          
+          const payload = {
+            driverId: JSON.parse(localStorage.getItem('user'))?.id,
+            rideId: activeRide.id,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            heading: position.coords.heading || 0,
+            timestamp: position.timestamp
+          };
+          
+          // Publish real-time STOMP payload 
+          if (WebSocketService.client && WebSocketService.client.connected) {
+            WebSocketService.client.publish({
+               destination: `/app/driver/location/${activeRide.id}`,
+               body: JSON.stringify(payload)
+            });
+            console.log('📍 Published location:', payload);
+          }
 
-        await updateDriverLocation(activeRide.id, mockLocation);
-        console.log('Location updated:', mockLocation);
-      } catch (error) {
-        console.error('Failed to update location:', error);
-      }
-    }, 5000);
-
-    // Store interval ID for cleanup
-    window.locationTrackingInterval = locationInterval;
+          // Backwards compatibility for HTTP tracking history if needed natively
+          try {
+             await updateDriverLocation(activeRide.id, {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                address: 'GPS Accuracy: ' + position.coords.accuracy + 'm'
+             });
+          } catch(e) {}
+        },
+        (error) => {
+          console.error("GPS Error:", error);
+          setToast({ message: 'Failed to access GPS. ' + error.message, type: 'error' });
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 }
+      );
+    } else {
+      setToast({ message: 'Geolocation is not supported by your browser', type: 'error' });
+    }
   };
 
   const stopLocationTracking = () => {
     setIsTracking(false);
     if (window.locationTrackingInterval) {
-      clearInterval(window.locationTrackingInterval);
+      if (navigator.geolocation && navigator.geolocation.clearWatch) {
+         navigator.geolocation.clearWatch(window.locationTrackingInterval);
+      } else {
+         clearInterval(window.locationTrackingInterval);
+      }
       window.locationTrackingInterval = null;
     }
     setToast({ message: 'Location tracking stopped!', type: 'info' });
@@ -230,7 +255,11 @@ const ActiveRideTracking = () => {
   useEffect(() => {
     return () => {
       if (window.locationTrackingInterval) {
-        clearInterval(window.locationTrackingInterval);
+        if (navigator.geolocation && navigator.geolocation.clearWatch) {
+           navigator.geolocation.clearWatch(window.locationTrackingInterval);
+        } else {
+           clearInterval(window.locationTrackingInterval);
+        }
       }
     };
   }, []);

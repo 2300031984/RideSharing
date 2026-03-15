@@ -1,95 +1,112 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/Toast';
 import { getRecentRidesLocal, getUserRidesPaged, rateRideApi } from '../../services/RideService';
-
-const API = (import.meta.env?.VITE_API_URL || 'http://localhost:8081');
+import '../../Styles/TripHistory.css';
 
 const TripHistory = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user')) || {};
-  const token = user?.token;
-  
+
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
+  const [filter, setFilter] = useState('all'); // 'all', 'completed', 'cancelled', 'in_progress'
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [toast, setToast] = useState({ message: '', type: 'info' });
+
+  const pageSize = 2;
 
   useEffect(() => {
     fetchTrips();
-  }, []);
+  }, [filter, page]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setPage(0);
+  }, [filter]);
 
   const fetchTrips = async () => {
     try {
       setLoading(true);
-      // Try backend paged history first
-      if (user?.id) {
-        const res = await getUserRidesPaged({ userId: user.id, page: 0, size: 20 });
-        if (res?.data?.content && Array.isArray(res.data.content)) {
-          setTrips(res.data.content);
-          return;
-        }
-      }
-      // Fallback to local store
-      const recent = getRecentRidesLocal();
-      const mappedLocal = (recent || []).map(r => {
-        const d = new Date(r.date || Date.now());
-        const date = d.toISOString().slice(0,10);
-        const time = d.toTimeString().slice(0,5);
-        return {
-          id: r.id,
-          date,
-          time,
-          pickup: r.pickup,
-          dropoff: r.dropoff,
-          driver: '—',
-          vehicle: '—',
-          fare: r.fare || 0,
-          status: r.status || 'requested',
-          rating: r.rating || null,
-          distance: r.distance || '—',
-          duration: r.duration || '—'
-        };
+
+      const userId = user?.id;
+      // Pass the filter logic to the backend/service
+      const statusParam = filter === 'all' ? undefined : filter;
+
+      const res = await getUserRidesPaged({
+        userId,
+        status: statusParam,
+        page,
+        size: pageSize
       });
-      setTrips(mappedLocal);
+
+      if (res?.data?.content) {
+        setTrips(res.data.content);
+        setTotalPages(res.data.totalPages || 0);
+        setTotalElements(res.data.totalElements || 0);
+      } else {
+        // Fallback to local
+        loadLocalFallback();
+      }
+
     } catch (error) {
       console.error('Error fetching trips:', error);
-      setToast({ message: 'Failed to load trip history. Using local data.', type: 'warning' });
-      // Try local fallback
-      const recent = getRecentRidesLocal();
-      const mappedLocal = (recent || []).map(r => {
-        const d = new Date(r.date || Date.now());
-        const date = d.toISOString().slice(0,10);
-        const time = d.toTimeString().slice(0,5);
-        return {
-          id: r.id,
-          date,
-          time,
-          pickup: r.pickup,
-          dropoff: r.dropoff,
-          driver: '—',
-          vehicle: '—',
-          fare: r.fare || 0,
-          status: r.status || 'requested',
-          rating: r.rating || null,
-          distance: r.distance || '—',
-          duration: r.duration || '—'
-        };
-      });
-      setTrips(mappedLocal);
+      setToast({ message: 'Failed to load specific history. Showing local data.', type: 'warning' });
+      loadLocalFallback();
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadLocalFallback = () => {
+    const recent = getRecentRidesLocal();
+    // In fallback mode, we have to do client-side filtering and pagination manually
+    let filtered = recent;
+    if (filter !== 'all') {
+      filtered = recent.filter(r => (r.status || 'requested') === filter);
+    }
+
+    // Manual Pagination
+    const start = page * pageSize;
+    const end = start + pageSize;
+    const paged = filtered.slice(start, end);
+
+    const mapped = paged.map(transformTripData);
+    setTrips(mapped);
+    setTotalPages(Math.ceil(filtered.length / pageSize));
+    setTotalElements(filtered.length);
+  };
+
+  const transformTripData = (r) => {
+    const d = new Date(r.date || Date.now());
+    return {
+      id: r.id,
+      date: d.toISOString().slice(0, 10),
+      time: d.toTimeString().slice(0, 5),
+      pickup: r.pickup || 'Unknown Location',
+      dropoff: r.dropoff || 'Unknown Location',
+      driver: r.driver || '—',
+      vehicle: r.vehicle || '—',
+      fare: r.fare || 0,
+      status: r.status || 'requested',
+      rating: r.rating || null,
+      distance: r.distance || '—',
+      duration: r.duration || '—'
+    };
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'green';
       case 'cancelled': return 'red';
-      case 'in_progress': return 'blue';
+      case 'in_progress':
+      case 'accepted':
+      case 'arrived':
+      case 'started':
+        return 'blue';
       default: return 'gray';
     }
   };
@@ -99,30 +116,12 @@ const TripHistory = () => {
       case 'completed': return 'Completed';
       case 'cancelled': return 'Cancelled';
       case 'in_progress': return 'In Progress';
+      case 'accepted': return 'Driver Accepted';
+      case 'arrived': return 'Driver Arrived';
+      case 'started': return 'Trip Started';
       default: return status;
     }
   };
-
-  const filteredTrips = trips.filter(trip => {
-    if (filter === 'all') return true;
-    return trip.status === filter;
-  });
-
-  const sortedTrips = [...filteredTrips].sort((a, b) => {
-    switch (sortBy) {
-      case 'date':
-        return new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time);
-      case 'fare':
-        return b.fare - a.fare;
-      case 'distance':
-        return parseFloat(b.distance) - parseFloat(a.distance);
-      default:
-        return 0;
-    }
-  });
-
-  // Show recent trips (limit to 10 for better performance)
-  const recentTrips = sortedTrips.slice(0, 10);
 
   const handleRateTrip = async (tripId, rating) => {
     try {
@@ -135,9 +134,8 @@ const TripHistory = () => {
   };
 
   const handleRepeatTrip = (trip) => {
-    // Navigate to booking with pre-filled data
-    navigate('/user/dashboard', { 
-      state: { 
+    navigate('/user/dashboard', {
+      state: {
         repeatTrip: {
           pickup: trip.pickup,
           dropoff: trip.dropoff
@@ -147,117 +145,79 @@ const TripHistory = () => {
   };
 
   const handleReportTrip = (tripId) => {
-    navigate('/report-incident', { 
-      state: { 
-        tripId,
-        prefill: true
-      }
+    navigate('/report-incident', {
+      state: { tripId, prefill: true }
     });
   };
 
-  if (loading) {
+  if (loading && page === 0 && trips.length === 0) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div className="trip-history-container" style={{ textAlign: 'center', marginTop: '4rem' }}>
         <p>Loading trip history...</p>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: 20 }}>
-      <h1 style={{ marginBottom: 24, fontSize: 28, fontWeight: 700 }}>Trip History</h1>
-      
-      {/* Filters and Sort */}
-      <Card style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 14 }}>
-              Filter by Status
-            </label>
+    <div className="trip-history-container">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 className="trip-history-title">Your Trips</h1>
+        <button className="book-ride-btn" onClick={() => navigate('/user/dashboard')}>
+          + Book Ride
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="trip-filters-card">
+        <div className="trip-filters-wrapper">
+          <div className="filter-group">
+            <label className="filter-label">Filter by Status</label>
             <select
+              className="filter-select"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14
-              }}
             >
               <option value="all">All Trips</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
-              <option value="in_progress">In Progress</option>
+              <option value="in_progress">Active / In Progress</option>
             </select>
           </div>
-          
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 14 }}>
-              Sort by
-            </label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14
-              }}
-            >
-              <option value="date">Date</option>
-              <option value="fare">Fare</option>
-              <option value="distance">Distance</option>
-            </select>
-          </div>
-          
-          <div style={{ marginLeft: 'auto', fontSize: 14, color: '#6b7280' }}>
-            {recentTrips.length} trips shown
+
+          <div className="trip-count">
+            Showing {trips.length} of {totalElements} trips
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Trip List */}
-      {recentTrips.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 48 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🚗</div>
-          <h3 style={{ marginBottom: 8 }}>No trips found</h3>
-          <p style={{ color: '#6b7280', marginBottom: 24 }}>
-            {filter === 'all' 
-              ? "You haven't taken any trips yet. Book your first ride!"
-              : `No ${filter} trips found.`
-            }
+      {/* Trip Grid */}
+      {trips.length === 0 ? (
+        <div className="empty-history">
+          <span className="empty-icon">🚖</span>
+          <h3 className="empty-title">No trips found</h3>
+          <p className="empty-text">
+            {filter === 'all'
+              ? "You haven't taken any trips yet."
+              : `No ${filter} trips found in your history.`}
           </p>
-          <button
-            onClick={() => navigate('/user/dashboard')}
-            style={{
-              padding: '12px 24px',
-              background: '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
-          >
-            Book a Ride
+          <button className="book-ride-btn" onClick={() => navigate('/user/dashboard')}>
+            Book a Ride Now
           </button>
-        </Card>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16 }}>
-          {recentTrips.map(trip => (
-            <Card key={trip.id} style={{ padding: 16, height: 'fit-content' }}>
-              {/* Trip Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontSize: 20 }}>🚗</div>
+        <div className="trips-grid">
+          {trips.map(trip => (
+            <div key={trip.id} className="trip-card">
+
+              {/* Header */}
+              <div className="trip-header">
+                <div className="trip-header-left">
+                  <div className="trip-icon-bg">🚗</div>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>
-                      {trip.date} at {trip.time}
+                    <div className="trip-date-time">
+                      {trip.date} • {trip.time}
                     </div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>
-                      Trip #{trip.id}
-                    </div>
+                    <div className="trip-id">ID: {trip.id}</div>
                   </div>
                 </div>
                 <Badge variant={getStatusColor(trip.status)}>
@@ -266,125 +226,115 @@ const TripHistory = () => {
               </div>
 
               {/* Route */}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <div style={{ width: 6, height: 6, background: '#10b981', borderRadius: '50%' }}></div>
-                  <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trip.pickup}</div>
+              <div className="trip-route">
+                <div className="route-line"></div>
+                <div className="route-point">
+                  <div className="route-dot dot-pickup"></div>
+                  <div className="route-address" title={trip.pickup}>{trip.pickup}</div>
                 </div>
-                <div style={{ width: 2, height: 12, background: '#d1d5db', marginLeft: 2 }}></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }}></div>
-                  <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trip.dropoff}</div>
+                <div className="route-point">
+                  <div className="route-dot dot-dropoff"></div>
+                  <div className="route-address" title={trip.dropoff}>{trip.dropoff}</div>
                 </div>
               </div>
 
-              {/* Trip Details Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Fare</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#059669' }}>₹{trip.fare}</div>
+              {/* Stats */}
+              <div className="trip-stats">
+                <div className="stat-item">
+                  <span className="stat-label">Fare</span>
+                  <span className="stat-value fare">₹{trip.fare}</span>
                 </div>
-                <div>
-                  <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Distance</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{trip.distance}</div>
+                <div className="stat-item">
+                  <span className="stat-label">Distance</span>
+                  <span className="stat-value">{trip.distance}</span>
                 </div>
-                <div>
-                  <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Duration</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{trip.duration}</div>
+                <div className="stat-item">
+                  <span className="stat-label">Time</span>
+                  <span className="stat-value">{trip.duration}</span>
                 </div>
-                <div>
-                  <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Driver</div>
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>{trip.driver}</div>
+                <div className="stat-item">
+                  <span className="stat-label">Driver</span>
+                  <span className="stat-value">{trip.driver}</span>
                 </div>
               </div>
 
               {/* Rating */}
               {trip.status === 'completed' && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>Rate your trip</div>
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <button
-                        key={star}
-                        onClick={() => handleRateTrip(trip.id, star)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: 16,
-                          color: star <= (trip.rating || 0) ? '#fbbf24' : '#d1d5db'
-                        }}
-                      >
-                        ⭐
-                      </button>
-                    ))}
-                    {trip.rating && (
-                      <span style={{ marginLeft: 6, fontSize: 12, color: '#6b7280' }}>
-                        ({trip.rating}/5)
-                      </span>
-                    )}
-                  </div>
+                <div className="trip-rating">
+                  {trip.rating ? (
+                    <div className="rating-display">
+                      You rated: {trip.rating} ⭐
+                    </div>
+                  ) : (
+                    <>
+                      <span className="rating-prompt">Rate trip:</span>
+                      <div>
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <button
+                            key={star}
+                            className="star-btn"
+                            onClick={() => handleRateTrip(trip.id, star)}
+                            style={{ color: '#d1d5db' }}
+                          >
+                            ⭐
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div className="trip-actions">
                 {trip.status === 'completed' && (
-                  <button
-                    onClick={() => handleRepeatTrip(trip)}
-                    style={{
-                      padding: '4px 8px',
-                      background: '#f0f9ff',
-                      border: '1px solid #0ea5e9',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      fontSize: 10,
-                      fontWeight: 500,
-                      color: '#0ea5e9'
-                    }}
-                  >
-                    Repeat
+                  <button className="action-btn btn-repeat" onClick={() => handleRepeatTrip(trip)}>
+                    ↺ Repeat
                   </button>
                 )}
-                
-                <button
-                  onClick={() => handleReportTrip(trip.id)}
-                  style={{
-                    padding: '4px 8px',
-                    background: '#fef2f2',
-                    border: '1px solid #dc2626',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                    fontSize: 10,
-                    fontWeight: 500,
-                    color: '#dc2626'
-                  }}
-                >
-                  Report
+
+                <button className="action-btn btn-report" onClick={() => handleReportTrip(trip.id)}>
+                  ⚠ Report
                 </button>
-                
-                <button
-                  onClick={() => navigate(`/ride/${trip.id}`)}
-                  style={{
-                    padding: '4px 8px',
-                    background: '#f3f4f6',
-                    border: '1px solid #6b7280',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                    fontSize: 10,
-                    fontWeight: 500,
-                    color: '#6b7280'
-                  }}
-                >
+
+                <button className="action-btn btn-details" onClick={() => navigate(`/ride/${trip.id}`)}>
                   Details
                 </button>
               </div>
-            </Card>
+
+            </div>
           ))}
         </div>
       )}
 
-      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'info' })} />
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="pagination-controls">
+          <button
+            className="page-btn"
+            disabled={page === 0}
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+          >
+            Previous
+          </button>
+          <span className="page-info">
+            Page {page + 1} of {totalPages}
+          </span>
+          <button
+            className="page-btn"
+            disabled={page >= totalPages - 1}
+            onClick={() => setPage(p => p + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: '', type: 'info' })}
+      />
     </div>
   );
 };

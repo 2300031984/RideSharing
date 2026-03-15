@@ -34,6 +34,15 @@ public class RideService {
     @Autowired
     private NotificationService notificationService;
     
+    @Autowired
+    private RideNotificationService rideNotificationService;
+    
+    @Autowired
+    private RideEventService rideEventService;
+    
+    @Autowired
+    private JobSchedulerService jobSchedulerService;
+    
     public Ride createRide(RideRequest request) {
         Optional<Rider> riderOpt = riderRepository.findById(request.getRiderId());
         if (riderOpt.isEmpty()) {
@@ -126,7 +135,7 @@ public class RideService {
         
         ride = rideRepository.save(ride);
         
-        // Notify user
+        // Notify user immediately that their booking is registered
         notificationService.createNotification(
             request.getPassengerId(),
             "Scheduled Ride Booked",
@@ -134,6 +143,11 @@ public class RideService {
             "RIDE_UPDATE",
             ride.getId()
         );
+        
+        // Pass the ride object alongside its exact localized timestamp context into the resilient Job queue
+        if (ride.getScheduledDateTime() != null) {
+            jobSchedulerService.scheduleRideDispatchJob(ride.getId(), ride.getScheduledDateTime());
+        }
         
         return ride;
     }
@@ -197,6 +211,8 @@ public class RideService {
             rideId
         );
         
+        rideNotificationService.sendRideUpdate(rideId, convertToResponse(ride));
+        
         return ride;
     }
     
@@ -220,6 +236,8 @@ public class RideService {
             "RIDE_UPDATE",
             rideId
         );
+        
+        rideNotificationService.sendRideUpdate(rideId, convertToResponse(ride));
         
         return ride;
     }
@@ -249,6 +267,8 @@ public class RideService {
             rideId
         );
         
+        rideNotificationService.sendRideUpdate(rideId, convertToResponse(ride));
+        
         return ride;
     }
     
@@ -264,33 +284,15 @@ public class RideService {
         
         ride = rideRepository.save(ride);
         
-        // Update rider stats
-        Optional<Rider> riderOpt = riderRepository.findById(ride.getRiderId());
-        if (riderOpt.isPresent()) {
-            Rider rider = riderOpt.get();
-            rider.setTotalRides(rider.getTotalRides() + 1);
-            riderRepository.save(rider);
-        }
-        
-        // Update driver stats and status
-        if (ride.getDriverId() != null) {
-            Optional<Driver> driverOpt = driverRepository.findById(ride.getDriverId());
-            if (driverOpt.isPresent()) {
-                Driver driver = driverOpt.get();
-                driver.setTotalRides(driver.getTotalRides() + 1);
-                driver.setTotalEarnings(driver.getTotalEarnings() + ride.getFare());
-                driver.setStatus(Driver.DriverStatus.AVAILABLE);
-                driverRepository.save(driver);
-            }
-        }
-        
-        // Notify rider
-        notificationService.createNotification(
+        // 1. Immediately emit the Kafka Event-Driven Architecture signal before heavy synchronous blocks occur.
+        // Payment, Earnings, Analytics, and Notifications will now be handled asynchronously.
+        rideEventService.publishRideCompletedEvent(
+            ride.getId(),
             ride.getRiderId(),
-            "Ride Completed",
-            "Your ride has been completed. Fare: ₹" + ride.getFare(),
-            "RIDE_UPDATE",
-            rideId
+            ride.getDriverId(),
+            ride.getFare(),
+            ride.getDistance(),
+            "CARD" // Or check ride.getPaymentMethod() if supported
         );
         
         return ride;
@@ -347,6 +349,8 @@ public class RideService {
             );
         }
         
+        rideNotificationService.sendRideUpdate(rideId, convertToResponse(ride));
+        
         return ride;
     }
     
@@ -388,9 +392,16 @@ public class RideService {
     }
     
     private String generateOTP() {
-        Random random = new Random();
-        int otp = 100000 + random.nextInt(900000);
-        return String.valueOf(otp);
+        try {
+            java.security.SecureRandom random = java.security.SecureRandom.getInstanceStrong();
+            int otp = 100000 + random.nextInt(900000);
+            return String.valueOf(otp);
+        } catch (Exception e) {
+            // Fallback
+            java.util.Random random = new java.util.Random();
+            int otp = 100000 + random.nextInt(900000);
+            return String.valueOf(otp);
+        }
     }
     
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {

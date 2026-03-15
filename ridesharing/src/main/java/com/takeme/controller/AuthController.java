@@ -23,7 +23,7 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(e.getMessage());
+                .body(ApiResponse.error(e.getMessage()));
         }
     }
     
@@ -45,7 +45,7 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(e.getMessage());
+                .body(ApiResponse.error(e.getMessage()));
         }
     }
     

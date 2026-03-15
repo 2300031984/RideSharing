@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Toast from '../../components/Toast';
 import EmergencyService from '../../services/EmergencyService';
+import '../../Styles/ReportIncident.css';
 
 const ReportIncident = () => {
   const navigate = useNavigate();
+  const locationState = useLocation();
   const user = JSON.parse(localStorage.getItem('user')) || {};
-  
+
   const [formData, setFormData] = useState({
     incidentType: '',
     description: '',
@@ -21,28 +23,43 @@ const ReportIncident = () => {
     contactNumber: user.phone || '',
     email: user.email || ''
   });
-  
+
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ message: '', type: 'info' });
   const [location, setLocation] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
 
   const incidentTypes = [
-    { value: 'safety', label: 'Safety Concern', description: 'Driver behavior, vehicle condition, etc.' },
-    { value: 'harassment', label: 'Harassment', description: 'Verbal, physical, or sexual harassment' },
-    { value: 'theft', label: 'Theft/Lost Items', description: 'Missing belongings or theft' },
-    { value: 'accident', label: 'Accident', description: 'Vehicle accident or collision' },
-    { value: 'fraud', label: 'Fraud/Scam', description: 'Payment fraud or driver scam' },
-    { value: 'discrimination', label: 'Discrimination', description: 'Based on race, gender, religion, etc.' },
-    { value: 'other', label: 'Other', description: 'Any other incident not listed above' }
+    { value: 'safety', label: 'Safety Concern', description: 'Driver behavior, vehicle condition' },
+    { value: 'harassment', label: 'Harassment', description: 'Verbal, physical, or sexual' },
+    { value: 'theft', label: 'Theft/Lost Items', description: 'Missing belongings' },
+    { value: 'accident', label: 'Accident', description: 'Vehicle collision or damage' },
+    { value: 'fraud', label: 'Fraud/Scam', description: 'Payment or route issues' },
+    { value: 'discrimination', label: 'Discrimination', description: 'Based on identity or background' },
+    { value: 'other', label: 'Other', description: 'Any other concern' }
   ];
 
   const severityLevels = [
-    { value: 'low', label: 'Low', description: 'Minor inconvenience' },
-    { value: 'medium', label: 'Medium', description: 'Moderate concern' },
-    { value: 'high', label: 'High', description: 'Serious issue' },
-    { value: 'critical', label: 'Critical', description: 'Emergency situation' }
+    { value: 'low', label: 'Low', description: 'Minor issue' },
+    { value: 'medium', label: 'Medium', description: 'Moderate' },
+    { value: 'high', label: 'High', description: 'Serious' },
+    { value: 'critical', label: 'Critical', description: 'Emergency' }
   ];
+
+  useEffect(() => {
+    // Set Default Date/Time
+    const { date, time } = getCurrentDateTime();
+
+    // Check for prefill data from navigation
+    const prefillData = locationState.state || {};
+
+    setFormData(prev => ({
+      ...prev,
+      date,
+      time,
+      rideId: prefillData.tripId || prev.rideId
+    }));
+  }, [locationState.state]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -63,8 +80,8 @@ const ReportIncident = () => {
         location: formData.location,
         latitude: location?.latitude,
         longitude: location?.longitude,
-        incidentDate: formData.date && formData.time ? 
-          new Date(`${formData.date}T${formData.time}`).toISOString() : 
+        incidentTime: formData.date && formData.time ?
+          new Date(`${formData.date}T${formData.time}`).toISOString() :
           new Date().toISOString(),
         driverName: formData.driverName,
         vehicleNumber: formData.vehicleNumber,
@@ -74,38 +91,22 @@ const ReportIncident = () => {
       };
 
       const response = await EmergencyService.reportIncident(user.id, incidentData);
-      
+
       if (response.success) {
-        setToast({ 
-          message: 'Incident report submitted successfully. We will investigate and get back to you within 24 hours.', 
-          type: 'success' 
+        setToast({
+          message: 'Report submitted. We will contact you shortly.',
+          type: 'success'
         });
-        
-        // Reset form
-        setFormData({
-          incidentType: '',
-          description: '',
-          location: '',
-          date: '',
-          time: '',
-          driverName: '',
-          vehicleNumber: '',
-          rideId: '',
-          severity: 'medium',
-          contactNumber: user.phone || '',
-          email: user.email || ''
-        });
-        
-        // Redirect after 3 seconds
+
         setTimeout(() => {
-          navigate('/emergency');
-        }, 3000);
+          navigate('/user/history'); // Redirect back to history or dashboard
+        }, 2000);
       } else {
-        setToast({ message: response.message || 'Failed to submit report. Please try again.', type: 'error' });
+        setToast({ message: response.message || 'Submission failed.', type: 'error' });
       }
-      
+
     } catch (error) {
-      setToast({ message: 'Failed to submit report. Please try again.', type: 'error' });
+      setToast({ message: 'Error submitting report.', type: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -120,11 +121,7 @@ const ReportIncident = () => {
 
   const handleSetCurrentDateTime = () => {
     const { date, time } = getCurrentDateTime();
-    setFormData(prev => ({
-      ...prev,
-      date,
-      time
-    }));
+    setFormData(prev => ({ ...prev, date, time }));
   };
 
   const getCurrentLocation = async () => {
@@ -136,372 +133,204 @@ const ReportIncident = () => {
         ...prev,
         location: `Lat: ${location.latitude.toFixed(6)}, Lng: ${location.longitude.toFixed(6)}`
       }));
-      setToast({ message: 'Location captured successfully', type: 'success' });
+      setToast({ message: 'Location captured', type: 'success' });
     } catch (error) {
-      setToast({ message: 'Unable to get your location. Please enter manually.', type: 'error' });
+      setToast({ message: 'Could not fetch location.', type: 'error' });
     } finally {
       setLoadingLocation(false);
     }
   };
 
-  useEffect(() => {
-    // Set current date and time by default
-    const { date, time } = getCurrentDateTime();
-    setFormData(prev => ({
-      ...prev,
-      date,
-      time
-    }));
-  }, []);
-
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 20 }}>
-      <h1 style={{ marginBottom: 24, fontSize: 28, fontWeight: 700, color: '#dc2626' }}>
-        Report an Incident
-      </h1>
+    <div className="report-container">
+      <h1 className="report-title">Report an Incident</h1>
 
-      <Card>
+      <div className="report-card">
         <form onSubmit={handleSubmit}>
-          {/* Incident Type */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-              Type of Incident *
-            </label>
-            <div style={{ display: 'grid', gap: 12 }}>
-              {incidentTypes.map(type => (
-                <label
-                  key={type.value}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 12,
-                    padding: 12,
-                    border: formData.incidentType === type.value ? '2px solid #2563eb' : '1px solid #e5e7eb',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    background: formData.incidentType === type.value ? '#f0f9ff' : '#fff'
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="incidentType"
-                    value={type.value}
-                    checked={formData.incidentType === type.value}
-                    onChange={(e) => handleInputChange('incidentType', e.target.value)}
-                    style={{ marginTop: 2 }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{type.label}</div>
-                    <div style={{ fontSize: 14, color: '#6b7280' }}>{type.description}</div>
-                  </div>
-                </label>
-              ))}
+          <div className="form-layout">
+
+            {/* Left Column: Selection */}
+            <div className="form-column-left">
+              {/* Incident Type Grid */}
+              <div className="form-section">
+                <label className="form-label">Type of Incident <span className="required-mark">*</span></label>
+                <div className="incident-grid">
+                  {incidentTypes.map(type => (
+                    <div
+                      key={type.value}
+                      className={`incident-option ${formData.incidentType === type.value ? 'selected' : ''}`}
+                      onClick={() => handleInputChange('incidentType', type.value)}
+                    >
+                      <input
+                        type="radio"
+                        name="incidentType"
+                        value={type.value}
+                        checked={formData.incidentType === type.value}
+                        onChange={() => { }}
+                        className="incident-radio"
+                      />
+                      <div className="incident-content">
+                        <h4>{type.label}</h4>
+                        <p>{type.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Severity */}
+              <div className="form-section">
+                <label className="form-label">Severity Level <span className="required-mark">*</span></label>
+                <div className="severity-grid">
+                  {severityLevels.map(level => (
+                    <div
+                      key={level.value}
+                      className={`severity-option ${formData.severity === level.value ? 'selected' : ''}`}
+                      onClick={() => handleInputChange('severity', level.value)}
+                    >
+                      <span className="severity-label">{level.label}</span>
+                      <span className="severity-desc">{level.description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Severity Level */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-              Severity Level *
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-              {severityLevels.map(level => (
-                <label
-                  key={level.value}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    padding: 12,
-                    border: formData.severity === level.value ? '2px solid #2563eb' : '1px solid #e5e7eb',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    background: formData.severity === level.value ? '#f0f9ff' : '#fff',
-                    textAlign: 'center'
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="severity"
-                    value={level.value}
-                    checked={formData.severity === level.value}
-                    onChange={(e) => handleInputChange('severity', e.target.value)}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{level.label}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>{level.description}</div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-              Description *
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Please provide a detailed description of what happened..."
-              rows={6}
-              style={{
-                width: '100%',
-                padding: 12,
-                border: '1px solid #d1d5db',
-                borderRadius: 8,
-                fontSize: 14,
-                resize: 'vertical'
-              }}
-              required
-            />
-          </div>
-
-          {/* Date and Time */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-                Date of Incident *
-              </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => handleInputChange('date', e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: 8,
-                    border: '1px solid #d1d5db',
-                    borderRadius: 6
-                  }}
+            {/* Right Column: Details */}
+            <div className="form-column-right">
+              {/* Description */}
+              <div className="form-section">
+                <label className="form-label">Description <span className="required-mark">*</span></label>
+                <textarea
+                  className="form-textarea"
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  placeholder="Please describe what happened in detail..."
                   required
                 />
-                <button
-                  type="button"
-                  onClick={handleSetCurrentDateTime}
-                  style={{
-                    padding: '8px 12px',
-                    background: '#f3f4f6',
-                    border: '1px solid #d1d5db',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    fontSize: 12
-                  }}
-                >
-                  Now
+              </div>
+
+              {/* Date & Time */}
+              <div className="input-group-row">
+                <div>
+                  <label className="form-label">Date <span className="required-mark">*</span></label>
+                  <div className="input-with-action">
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={formData.date}
+                      onChange={(e) => handleInputChange('date', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="form-label">Time <span className="required-mark">*</span></label>
+                  <div className="input-with-action">
+                    <input
+                      type="time"
+                      className="form-input"
+                      value={formData.time}
+                      onChange={(e) => handleInputChange('time', e.target.value)}
+                      required
+                    />
+                    <button type="button" className="action-btn secondary" onClick={handleSetCurrentDateTime}>
+                      Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className="form-section">
+                <label className="form-label">Location <span className="required-mark">*</span></label>
+                <div className="input-with-action">
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={formData.location}
+                    onChange={(e) => handleInputChange('location', e.target.value)}
+                    placeholder="Enter location or use GPS"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={getCurrentLocation}
+                    disabled={loadingLocation}
+                  >
+                    {loadingLocation ? '...' : '📍 GPS'}
+                  </button>
+                </div>
+                {location && (
+                  <div className="location-status">
+                    ✅ GPS: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                  </div>
+                )}
+              </div>
+
+              {/* Details Row */}
+              <div className="input-group-row">
+                <div>
+                  <label className="form-label">Driver Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={formData.driverName}
+                    onChange={(e) => handleInputChange('driverName', e.target.value)}
+                    placeholder="Optional"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Vehicle No.</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={formData.vehicleNumber}
+                    onChange={(e) => handleInputChange('vehicleNumber', e.target.value)}
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+
+              {/* Ride ID & Contact */}
+              <div className="input-group-row">
+                <div>
+                  <label className="form-label">Ride ID</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={formData.rideId}
+                    onChange={(e) => handleInputChange('rideId', e.target.value)}
+                    placeholder="Trip ID"
+                    readOnly={!!locationState.state?.tripId}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Contact <span className="required-mark">*</span></label>
+                  <input
+                    type="tel"
+                    className="form-input"
+                    value={formData.contactNumber}
+                    onChange={(e) => handleInputChange('contactNumber', e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="form-actions">
+                <button type="button" className="btn-cancel" onClick={() => navigate(-1)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-submit" disabled={submitting}>
+                  {submitting ? 'Submitting...' : 'Submit Report'}
                 </button>
               </div>
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-                Time of Incident *
-              </label>
-              <input
-                type="time"
-                value={formData.time}
-                onChange={(e) => handleInputChange('time', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 8,
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6
-                }}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Location */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-              Location *
-            </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => handleInputChange('location', e.target.value)}
-                placeholder="Where did the incident occur?"
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  border: '1px solid #d1d5db',
-                  borderRadius: 8
-                }}
-                required
-              />
-              <button
-                type="button"
-                onClick={getCurrentLocation}
-                disabled={loadingLocation}
-                style={{
-                  padding: '12px 16px',
-                  background: loadingLocation ? '#9ca3af' : '#2563eb',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  cursor: loadingLocation ? 'not-allowed' : 'pointer',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {loadingLocation ? '⏳' : '📍'} Get Location
-              </button>
-            </div>
-            {location && (
-              <div style={{ marginTop: 8, padding: 8, background: '#f0f9ff', borderRadius: 6, fontSize: 12, color: '#1e40af' }}>
-                ✅ Location captured: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                {location.accuracy && ` (Accuracy: ±${Math.round(location.accuracy)}m)`}
-              </div>
-            )}
-          </div>
-
-          {/* Driver and Vehicle Details */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-                Driver Name
-              </label>
-              <input
-                type="text"
-                value={formData.driverName}
-                onChange={(e) => handleInputChange('driverName', e.target.value)}
-                placeholder="Driver's name (if known)"
-                style={{
-                  width: '100%',
-                  padding: 8,
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-                Vehicle Number
-              </label>
-              <input
-                type="text"
-                value={formData.vehicleNumber}
-                onChange={(e) => handleInputChange('vehicleNumber', e.target.value)}
-                placeholder="Vehicle number (if known)"
-                style={{
-                  width: '100%',
-                  padding: 8,
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Ride ID */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-              Ride ID
-            </label>
-            <input
-              type="text"
-              value={formData.rideId}
-              onChange={(e) => handleInputChange('rideId', e.target.value)}
-              placeholder="Ride ID (if available)"
-              style={{
-                width: '100%',
-                padding: 8,
-                border: '1px solid #d1d5db',
-                borderRadius: 6
-              }}
-            />
-          </div>
-
-          {/* Contact Information */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-                Contact Number *
-              </label>
-              <input
-                type="tel"
-                value={formData.contactNumber}
-                onChange={(e) => handleInputChange('contactNumber', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 8,
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6
-                }}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-                Email Address *
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 8,
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6
-                }}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Submit Buttons */}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              style={{
-                padding: '12px 24px',
-                background: 'none',
-                border: '1px solid #d1d5db',
-                borderRadius: 8,
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || !formData.incidentType || !formData.description}
-              style={{
-                padding: '12px 24px',
-                background: submitting ? '#9ca3af' : '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                fontWeight: 600
-              }}
-            >
-              {submitting ? 'Submitting...' : 'Submit Report'}
-            </button>
           </div>
         </form>
-      </Card>
-
-      {/* Important Notice */}
-      <Card style={{ marginTop: 24, background: '#fef2f2', border: '1px solid #fecaca' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{ fontSize: 20 }}>⚠️</div>
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: '#dc2626' }}>
-              Important Notice
-            </div>
-            <div style={{ fontSize: 14, color: '#7f1d1d', lineHeight: 1.5 }}>
-              • All reports are taken seriously and will be investigated promptly<br/>
-              • False reports may result in account suspension<br/>
-              • For immediate emergencies, please contact local authorities<br/>
-              • We will contact you within 24 hours regarding your report
-            </div>
-          </div>
-        </div>
-      </Card>
+      </div>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'info' })} />
     </div>

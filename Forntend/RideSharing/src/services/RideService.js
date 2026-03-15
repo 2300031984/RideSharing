@@ -62,7 +62,7 @@ const readRecent = () => {
   try { return JSON.parse(localStorage.getItem('recentRides')) || []; } catch { return []; }
 };
 const writeRecent = (list) => {
-  try { localStorage.setItem('recentRides', JSON.stringify(list)); } catch {}
+  try { localStorage.setItem('recentRides', JSON.stringify(list)); } catch { }
 };
 
 // pending requests (for driver mock feed)
@@ -70,7 +70,7 @@ const readPending = () => {
   try { return JSON.parse(localStorage.getItem('pendingRideRequests')) || []; } catch { return []; }
 };
 const writePending = (list) => {
-  try { localStorage.setItem('pendingRideRequests', JSON.stringify(list)); } catch {}
+  try { localStorage.setItem('pendingRideRequests', JSON.stringify(list)); } catch { }
 };
 
 // ✅ Book a new ride (for users) with mock fallback
@@ -162,18 +162,18 @@ export const getUserRidesPaged = async ({ userId, status, from, to, page = 0, si
         dropoffLatitude: ride.dropoffLatitude,
         dropoffLongitude: ride.dropoffLongitude
       }));
-      
+
       // Apply filters
       let filteredRides = rides;
       if (status && status !== 'all') {
         filteredRides = rides.filter(ride => ride.status === status);
       }
-      
+
       // Apply pagination
       const startIndex = page * size;
       const endIndex = startIndex + size;
       const paginatedRides = filteredRides.slice(startIndex, endIndex);
-      
+
       return {
         data: {
           content: paginatedRides,
@@ -204,7 +204,7 @@ export const getUserRidesPaged = async ({ userId, status, from, to, page = 0, si
       duration: ride.duration || '—',
       createdAt: ride.date
     }));
-    
+
     return {
       data: {
         content: mappedRides,
@@ -270,7 +270,7 @@ export const requestRide = async ({ pickup, drop, vehicleType, paymentMethod, pr
     // Get current user info
     const user = JSON.parse(localStorage.getItem('user'));
     const userId = user?.id;
-    
+
     if (!userId) {
       throw new Error('User not found');
     }
@@ -286,29 +286,29 @@ export const requestRide = async ({ pickup, drop, vehicleType, paymentMethod, pr
       dropoffLongitude: drop?.lng,
       vehicleType: vehicleType
     });
-    
+
     const rideData = res?.data?.ride || res?.data;
-    const id = rideData?.id || Math.floor(Math.random()*1e9).toString();
+    const id = rideData?.id || Math.floor(Math.random() * 1e9).toString();
     const otp = res?.data?.otp || Math.floor(100000 + Math.random() * 900000);
-    
+
     // Save to local storage for immediate UI feedback
     const list = readRecent();
-    list.unshift({ 
-      id, 
-      date: new Date().toISOString(), 
-      pickup: pickup?.address, 
-      dropoff: drop?.address, 
-      fare: price, 
-      status: 'requested', 
-      otp, 
-      distance, 
+    list.unshift({
+      id,
+      date: new Date().toISOString(),
+      pickup: pickup?.address,
+      dropoff: drop?.address,
+      fare: price,
+      status: 'requested',
+      otp,
+      distance,
       duration,
       vehicleType,
       passengerId: userId,
       passengerName: user?.username || 'User'
     });
     writeRecent(list.slice(0, 20));
-    
+
     console.log('Ride request saved to database with ID:', id);
     return { data: { id, otp, ...rideData } };
   } catch (e) {
@@ -318,20 +318,29 @@ export const requestRide = async ({ pickup, drop, vehicleType, paymentMethod, pr
   }
 };
 
-export const estimateFare = async ({ pickup, drop, vehicleType }) => {
+export const estimateFare = async ({ pickup, drop, vehicleType, distance }) => {
   try {
-    // No backend endpoint; return null to trigger UI fallback estimation
-    return null;
+    // Distance from frontend map or auto-calc
+    // Send to backend
+    const res = await api.post('/rides/estimate-fare', {
+      vehicleType,
+      distance: distance || 5.0, // fallback distance if map not ready
+      pickup,
+      drop
+    });
+    return res?.data?.data?.fare ? Math.round(res.data.data.fare) : null;
   } catch (e) {
-    return null; // caller will fallback to local estimate
+    console.warn('Fare estimation failed:', e);
+    return null;
   }
 };
 
 export const getNearbyDrivers = async ({ lat, lng }) => {
   try {
-    // No backend endpoint; return empty list gracefully
-    return [];
+    const res = await api.get(`/drivers/nearby`, { params: { lat, lng, radius: 5.0 } });
+    return res?.data || [];
   } catch (e) {
+    console.error('Failed to get nearby drivers:', e);
     return [];
   }
 };
@@ -343,10 +352,10 @@ export const cancelRideApi = async (rideId, userId, reason = 'User cancelled') =
     const res = await api.post(`/rides/${rideId}/cancel?userId=${encodeURIComponent(userId || '')}`, {
       reason: reason
     });
-    
+
     // Update local storage for immediate UI feedback
     updateRecentStatusLocal(rideId, 'cancelled');
-    
+
     return {
       success: true,
       data: res?.data || { status: 'cancelled' },
@@ -354,10 +363,10 @@ export const cancelRideApi = async (rideId, userId, reason = 'User cancelled') =
     };
   } catch (error) {
     console.error('Cancel ride API error:', error);
-    
+
     // Update local storage even if API fails
     updateRecentStatusLocal(rideId, 'cancelled');
-    
+
     return {
       success: false,
       data: { status: 'cancelled' },
@@ -396,7 +405,7 @@ export const connectRideSocket = (rideId, onMessage) => {
     // WebSocket not implemented in backend; return null
     const ws = null;
     ws.onmessage = (evt) => {
-      try { const data = JSON.parse(evt.data); onMessage && onMessage(data); } catch {}
+      try { const data = JSON.parse(evt.data); onMessage && onMessage(data); } catch { }
     };
     return ws;
   } catch {
@@ -481,35 +490,38 @@ export const capturePayment = async ({ orderId, paymentId, signature }) => {
 
 export const getWalletBalance = async () => {
   try {
-    return readWalletLocal();
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user?.id) return 0;
+    const res = await api.get(`/wallet/${user.id}/balance`);
+    return res?.data?.balance || 0;
   } catch (e) {
-    return readWalletLocal();
+    console.error("Wallet balance fetch failed:", e);
+    return 0;
   }
 };
 
 export const addWalletFunds = async ({ amount }) => {
   try {
-    const bal = readWalletLocal() + (amount || 0);
-    writeWalletLocal(bal);
-    const hist = readPaymentsLocal();
-    hist.unshift({ id: 'topup_' + Date.now(), amount, status: 'success', date: new Date().toISOString() });
-    writePaymentsLocal(hist.slice(0, 50));
-    return { balance: bal };
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user?.id) throw new Error("User not found");
+
+    const res = await api.post(`/wallet/${user.id}/recharge`, { amount, paymentMethod: 'Card' });
+    return { balance: res?.data?.data?.newBalance || 0 };
   } catch (e) {
-    const bal = readWalletLocal() + (amount || 0);
-    writeWalletLocal(bal);
-    const hist = readPaymentsLocal();
-    hist.unshift({ id: 'topup_' + Date.now(), amount, status: 'success', date: new Date().toISOString() });
-    writePaymentsLocal(hist.slice(0, 50));
-    return { balance: bal };
+    console.error("Add funds failed:", e);
+    throw e;
   }
 };
 
 export const getPaymentsHistory = async () => {
   try {
-    return readPaymentsLocal();
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user?.id) return [];
+    const res = await api.get(`/wallet/${user.id}/transactions`);
+    return res?.data || [];
   } catch (e) {
-    return readPaymentsLocal();
+    console.warn("Payment history fetch failed:", e);
+    return [];
   }
 };
 
@@ -575,7 +587,7 @@ export const requestScheduledRide = async ({ pickup, drop, vehicleType, price, d
   try {
     const user = JSON.parse(localStorage.getItem('user'));
     const userId = user?.id;
-    
+
     if (!userId) {
       throw new Error('User not found');
     }
@@ -595,20 +607,20 @@ export const requestScheduledRide = async ({ pickup, drop, vehicleType, price, d
       scheduledDate: scheduledDate,
       scheduledTime: scheduledTime
     });
-    
+
     const rideData = res?.data;
-    const id = rideData?.id || Math.floor(Math.random()*1e9).toString();
-    
+    const id = rideData?.id || Math.floor(Math.random() * 1e9).toString();
+
     // Save to local storage for immediate UI feedback
     const list = readRecent();
-    list.unshift({ 
-      id, 
-      date: new Date().toISOString(), 
-      pickup: pickup?.address, 
-      dropoff: drop?.address, 
-      fare: price, 
-      status: 'requested', 
-      distance, 
+    list.unshift({
+      id,
+      date: new Date().toISOString(),
+      pickup: pickup?.address,
+      dropoff: drop?.address,
+      fare: price,
+      status: 'requested',
+      distance,
       duration,
       vehicleType,
       passengerId: userId,
@@ -617,7 +629,7 @@ export const requestScheduledRide = async ({ pickup, drop, vehicleType, price, d
       scheduledAt: `${scheduledDate}T${scheduledTime}`
     });
     writeRecent(list.slice(0, 20));
-    
+
     // Persist a compact scheduled rides list (used by driver scheduled page)
     try {
       const sched = JSON.parse(localStorage.getItem('scheduledRides') || '[]');
@@ -633,7 +645,7 @@ export const requestScheduledRide = async ({ pickup, drop, vehicleType, price, d
         scheduledTime
       });
       localStorage.setItem('scheduledRides', JSON.stringify(sched.slice(0, 100)));
-    } catch {}
+    } catch { }
 
     console.log('Scheduled ride request saved to database with ID:', id);
     return { data: { id, ...rideData } };
