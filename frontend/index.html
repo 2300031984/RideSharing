@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RideConnect – Ride Sharing Platform</title>
+    <style>
+      body {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: #0f172a;
+        color: #f8fafc;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        max-width: 500px;
+      }
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(to right, #38bdf8, #818cf8);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      p {
+        color: #94a3b8;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+      }
+      .button-group {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+      }
+      button {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-primary {
+        background: #38bdf8;
+        color: #0f172a;
+      }
+      .btn-primary:hover {
+        background: #7dd3fc;
+        transform: translateY(-2px);
+      }
+      .btn-secondary {
+        background: #334155;
+        color: #f8fafc;
+      }
+      .btn-secondary:hover {
+        background: #475569;
+        transform: translateY(-2px);
+      }
+      #status {
+        margin-top: 1.5rem;
+        font-size: 0.9rem;
+        color: #10b981;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="container">
+        <h1>RideConnect</h1>
+        <p>Your premium ride-sharing ecosystem.</p>
+        <div class="button-group">
+          <button class="btn-primary" onclick="testBackend()">Test Backend API</button>
+          <button class="btn-secondary" onclick="checkHealth()">Server Health</button>
+        </div>
+        <div id="status"></div>
+      </div>
+    </div>
+    <script>
+      async function testBackend() {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerText = 'Testing API...';
+        try {
+          const response = await fetch('/api/health'); // Assuming health check endpoint
+          const data = await response.json();
+          statusDiv.innerText = 'Backend Response: ' + JSON.stringify(data);
+        } catch (err) {
+          statusDiv.innerText = 'Backend Error: Connection failed (Ensure backend is running on :8081)';
+          statusDiv.style.color = '#ef4444';
+        }
+      }
+      async function checkHealth() {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerText = 'Checking Health...';
+        try {
+          const response = await fetch('/actuator/health'); 
+          const data = await response.json();
+          statusDiv.innerText = 'Server Health: ' + data.status;
+          statusDiv.style.color = data.status === 'UP' ? '#10b981' : '#f59e0b';
+        } catch (err) {
+          statusDiv.innerText = 'Health Check Failed';
+          statusDiv.style.color = '#ef4444';
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

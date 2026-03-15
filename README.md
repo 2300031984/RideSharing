@@ -103,8 +103,7 @@ RideSharingApp/
 ├── ridesharing/        # Spring Boot Application (Backend)
 │   ├── src/            # Java Source & Resources
 │   └── pom.xml         # Maven Config
-├── Forntend/           # Frontend root
-│   └── RideSharing/    # React Frontend (Vite)
+├── frontend/           # React Frontend (Vite)
 ├── docs/               # System architecture & Logic flows
 └── tools/              # Postman Collections & Setup Scripts
 ```
