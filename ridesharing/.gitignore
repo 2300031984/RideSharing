@@ -32,3 +32,6 @@ Thumbs.db
 # Application
 application-local.properties
 application-dev.properties
+
+# Local environment variables (secrets)
+.env

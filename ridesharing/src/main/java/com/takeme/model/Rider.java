@@ -15,9 +15,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Rider {
-    
-    public Long getId() {
+	
+	public Long getId() {
 		return id;
+	}
 
 	public void setAge(Integer age) {
 		this.age = age;
