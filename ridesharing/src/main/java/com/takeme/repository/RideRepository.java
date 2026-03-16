@@ -1,8 +1,8 @@
 package com.takeme.repository;
 
 import com.takeme.model.Ride;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -10,26 +10,22 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface RideRepository extends JpaRepository<Ride, Long> {
-    List<Ride> findByRiderId(Long riderId);
-    List<Ride> findByDriverId(Long driverId);
+public interface RideRepository extends MongoRepository<Ride, String> {
+    List<Ride> findByRiderId(String riderId);
+    List<Ride> findByDriverId(String driverId);
     List<Ride> findByStatus(Ride.RideStatus status);
     
-    @Query("SELECT r FROM Ride r WHERE r.status = :status AND r.vehicleType = :vehicleType")
-    List<Ride> findByStatusAndVehicleType(@Param("status") Ride.RideStatus status, @Param("vehicleType") String vehicleType);
+    List<Ride> findByStatusAndVehicleType(Ride.RideStatus status, String vehicleType);
     
-    @Query("SELECT r FROM Ride r WHERE r.riderId = :riderId ORDER BY r.createdAt DESC")
-    List<Ride> findByRiderIdOrderByCreatedAtDesc(@Param("riderId") Long riderId);
+    List<Ride> findByRiderIdOrderByCreatedAtDesc(String riderId);
     
-    @Query("SELECT r FROM Ride r WHERE r.driverId = :driverId ORDER BY r.createdAt DESC")
-    List<Ride> findByDriverIdOrderByCreatedAtDesc(@Param("driverId") Long driverId);
+    List<Ride> findByDriverIdOrderByCreatedAtDesc(String driverId);
     
-    @Query("SELECT r FROM Ride r WHERE r.isScheduled = true AND r.status = 'REQUESTED' ORDER BY r.scheduledDateTime ASC")
-    List<Ride> findScheduledRides();
+    List<Ride> findByIsScheduledAndStatusOrderByScheduledDateTimeAsc(boolean isScheduled, Ride.RideStatus status);
     
-    @Query("SELECT r FROM Ride r WHERE r.riderId = :riderId AND r.status = :status")
+    List<Ride> findByRiderIdAndStatus(String riderId, Ride.RideStatus status);
     List<Ride> findByRiderIdAndStatus(@Param("riderId") Long riderId, @Param("status") Ride.RideStatus status);
     
     @Query("SELECT r FROM Ride r WHERE r.driverId = :driverId AND r.status = :status")
-    List<Ride> findByDriverIdAndStatus(@Param("driverId") Long driverId, @Param("status") Ride.RideStatus status);
+    List<Ride> findByDriverIdAndStatus(String driverId, Ride.RideStatus status);
 }
